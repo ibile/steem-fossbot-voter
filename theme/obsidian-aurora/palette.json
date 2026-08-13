@@ -1,0 +1,28 @@
+{
+  "name": "Obsidian Aurora",
+  "device": "Samsung Galaxy S23 Ultra",
+  "resolution": [
+    1440,
+    3088
+  ],
+  "palette": {
+    "base": "#07080B",
+    "surface": "#0E1116",
+    "surfaceAlt": "#151A21",
+    "outline": "#232A34",
+    "teal": "#4FE3C1",
+    "violet": "#7C6CF5",
+    "rose": "#E85A9B",
+    "indigo": "#2B2C6B",
+    "text": "#F2F4F7",
+    "muted": "#8B93A1"
+  },
+  "auroraRamp": [
+    "#3BD9C4",
+    "#4FE3C1",
+    "#5AC8E8",
+    "#7C6CF5",
+    "#B364E0",
+    "#E85A9B"
+  ]
+}

@@ -1,0 +1,446 @@
+<title>Obsidian Aurora</title>
+<style>
+  @font-face{font-family:"Jura";src:url("data:font/ttf;base64,{{FONT_JURA}}") format("truetype");font-weight:300;font-display:block}
+  @font-face{font-family:"Outfit";src:url("data:font/ttf;base64,{{FONT_OUTFIT}}") format("truetype");font-weight:400;font-display:swap}
+  @font-face{font-family:"Outfit";src:url("data:font/ttf;base64,{{FONT_OUTFIT_BOLD}}") format("truetype");font-weight:700;font-display:swap}
+  @font-face{font-family:"GeistMono";src:url("data:font/ttf;base64,{{FONT_MONO}}") format("truetype");font-weight:400;font-display:swap}
+
+  /* Single-theme by intent: this page shows an AMOLED dark theme, so it
+     commits to that world and paints every colour explicitly. */
+  :root{
+    --ground:#07080B;
+    --panel:#0D1015;
+    --raised:#141922;
+    --hairline:rgba(255,255,255,.075);
+    --hairline-strong:rgba(255,255,255,.14);
+    --ink:#F2F4F7;
+    --muted:#8B93A1;
+    --dim:#5C6675;
+    --teal:#4FE3C1;
+    --violet:#7C6CF5;
+    --rose:#E85A9B;
+    --cyan:#5AC8E8;
+    --orchid:#B364E0;
+
+    --display:"Jura",ui-sans-serif,system-ui,sans-serif;
+    --body:"Outfit",ui-sans-serif,system-ui,sans-serif;
+    --mono:"GeistMono",ui-monospace,SFMono-Regular,monospace;
+
+    --f-hero:clamp(3.4rem,12vw,8rem);
+    --f-h2:clamp(1.6rem,3.2vw,2.4rem);
+    --f-h3:1.0625rem;
+    --f-body:1.0625rem;
+    --f-small:.9rem;
+    --f-label:.7rem;
+
+    --gut:clamp(1.25rem,4vw,2.5rem);
+    --stack:clamp(4.5rem,10vw,8rem);
+    --maxw:1120px;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:var(--f-body);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  .wrap{max-width:var(--maxw);margin:0 auto;padding-inline:var(--gut)}
+
+  .label{
+    font-family:var(--mono);font-size:var(--f-label);
+    letter-spacing:.22em;text-transform:uppercase;color:var(--dim);
+    margin:0;
+  }
+
+  h1,h2,h3{text-wrap:balance;margin:0}
+  h2{
+    font-family:var(--display);font-weight:300;
+    font-size:var(--f-h2);letter-spacing:.02em;line-height:1.15;
+  }
+  h3{font-family:var(--body);font-weight:700;font-size:var(--f-h3);letter-spacing:.01em}
+  p{margin:0}
+
+  section{padding-block:var(--stack)}
+  .head{display:flex;flex-direction:column;gap:.9rem;margin-bottom:2.75rem;max-width:62ch}
+  .head p:last-child{color:var(--muted)}
+
+  /* ---------------- hero ---------------- */
+  .hero{position:relative;min-height:min(100svh,980px);display:grid;align-items:center;padding-block:clamp(4rem,9vw,7rem) var(--stack);overflow:hidden}
+  #aurora{
+    position:absolute;left:50%;top:0;translate:-50% 0;
+    width:min(1600px,165vw);height:100%;
+    filter:blur(19px);opacity:.8;pointer-events:none;
+    -webkit-mask-image:radial-gradient(130% 82% at 50% 74%,#000 6%,rgba(0,0,0,.5) 44%,transparent 80%);
+    mask-image:radial-gradient(130% 82% at 50% 74%,#000 6%,rgba(0,0,0,.5) 44%,transparent 80%);
+  }
+  .hero .wrap{position:relative;display:grid;grid-template-columns:1.15fr .85fr;gap:clamp(2rem,5vw,4.5rem);align-items:center;width:100%}
+  .hero-copy{display:flex;flex-direction:column;gap:1.5rem}
+  h1{
+    font-family:var(--display);font-weight:300;
+    font-size:var(--f-hero);line-height:.92;letter-spacing:-.005em;
+    margin:0;
+  }
+  h1 .b{display:block;color:var(--teal)}
+  .lede{font-size:clamp(1.05rem,1.5vw,1.2rem);color:var(--muted);max-width:44ch}
+  .spec{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.4rem}
+  .spec span{
+    font-family:var(--mono);font-size:var(--f-label);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted);
+    border:1px solid var(--hairline);border-radius:999px;padding:.42rem .8rem;
+    background:rgba(255,255,255,.02);
+  }
+
+  /* ---------------- device ---------------- */
+  .device{
+    position:relative;aspect-ratio:1440/3088;background:#000;
+    border-radius:clamp(22px,3.2vw,40px);
+    border:1px solid var(--hairline-strong);
+    box-shadow:0 2px 0 rgba(255,255,255,.06) inset,0 40px 90px -30px rgba(0,0,0,.9),0 0 0 7px #0a0c10;
+    overflow:hidden;
+  }
+  .device img{display:block;width:100%;height:100%;object-fit:cover}
+  .device::after{ /* punch-hole camera */
+    content:"";position:absolute;top:1.15%;left:50%;translate:-50% 0;
+    width:2.6%;aspect-ratio:1;border-radius:50%;
+    background:#000;box-shadow:0 0 0 1px rgba(255,255,255,.09);
+  }
+  .hero-device{width:min(100%,320px);justify-self:end;filter:drop-shadow(0 30px 60px rgba(79,227,193,.10))}
+
+  /* ---------------- screens ---------------- */
+  .screens{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:clamp(1.5rem,3.5vw,2.75rem)}
+  .screen{display:flex;flex-direction:column;gap:1rem}
+  .screen figcaption{display:flex;flex-direction:column;gap:.3rem}
+  .screen .cap{font-family:var(--body);font-weight:700;font-size:.98rem}
+  .screen .sub{font-size:var(--f-small);color:var(--muted);line-height:1.5}
+
+  /* ---------------- palette ---------------- */
+  /* 10 tokens: 5x2 on desktop, 2x5 below — both land square, no dead cells. */
+  .palette{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--hairline);border:1px solid var(--hairline);border-radius:14px;overflow:hidden}
+  .sw{background:var(--panel);padding:1.15rem 1.15rem 1.25rem;display:flex;flex-direction:column;gap:.85rem}
+  .chip{width:100%;height:56px;border-radius:8px;border:1px solid rgba(255,255,255,.09)}
+  .sw .hex{font-family:var(--mono);font-size:.82rem;letter-spacing:.06em;color:var(--ink)}
+  .sw .role{font-size:.82rem;color:var(--muted);line-height:1.45}
+  .ramp{margin-top:1.75rem;border:1px solid var(--hairline);border-radius:14px;padding:1.25rem;background:var(--panel)}
+  .ramp-bar{height:56px;border-radius:8px;border:1px solid rgba(255,255,255,.09);
+    background:linear-gradient(90deg,#3BD9C4,#4FE3C1,#5AC8E8,#7C6CF5,#B364E0,#E85A9B)}
+  .ramp-stops{display:flex;flex-wrap:wrap;gap:.4rem 1.15rem;margin-top:.9rem;font-family:var(--mono);font-size:.76rem;color:var(--muted);letter-spacing:.05em}
+
+  /* ---------------- notes ---------------- */
+  .notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem}
+  .note{border:1px solid var(--hairline);border-radius:14px;padding:1.6rem;background:var(--panel);display:flex;flex-direction:column;gap:.7rem}
+  .note .k{width:26px;height:2px;border-radius:2px;margin-bottom:.35rem}
+  .note p{color:var(--muted);font-size:.95rem;line-height:1.6}
+
+  /* ---------------- wallpapers ---------------- */
+  .walls{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:clamp(1rem,2.5vw,1.75rem)}
+  .wall{display:flex;flex-direction:column;gap:.85rem}
+  .wall .frame{aspect-ratio:1440/3088;border-radius:14px;overflow:hidden;border:1px solid var(--hairline);background:#000}
+  .wall img{display:block;width:100%;height:100%;object-fit:cover}
+  .wall .n{font-family:var(--mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .wall .d{font-size:.85rem;color:var(--dim);line-height:1.45;margin-top:-.5rem}
+
+  /* ---------------- type ---------------- */
+  .type{display:grid;gap:1px;background:var(--hairline);border:1px solid var(--hairline);border-radius:14px;overflow:hidden}
+  .spec-row{background:var(--panel);padding:1.5rem clamp(1.15rem,2.5vw,2rem);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem 2rem;align-items:baseline}
+  .spec-row .sample{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .s-jura{font-family:var(--display);font-weight:300;font-size:clamp(2.4rem,6vw,3.6rem);letter-spacing:.02em;color:var(--ink)}
+  .s-outfit{font-family:var(--body);font-weight:400;font-size:clamp(1.3rem,3vw,1.8rem)}
+  .s-mono{font-family:var(--mono);font-size:clamp(.95rem,2vw,1.15rem);letter-spacing:.1em;color:var(--muted)}
+  .spec-meta{text-align:right;font-family:var(--mono);font-size:var(--f-label);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);line-height:1.9;white-space:nowrap}
+
+  /* ---------------- setup ---------------- */
+  .steps{list-style:none;margin:0;padding:0;counter-reset:s;display:grid;gap:1px;background:var(--hairline);border:1px solid var(--hairline);border-radius:14px;overflow:hidden}
+  .steps li{background:var(--panel);counter-increment:s;padding:1.4rem clamp(1.15rem,2.5vw,1.85rem);display:grid;grid-template-columns:auto minmax(0,1fr);gap:1.25rem;align-items:start}
+  .steps li::before{
+    content:counter(s,decimal-leading-zero);
+    font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;color:var(--teal);
+    padding-top:.22rem;
+  }
+  .steps .t{font-weight:700;font-size:.98rem}
+  .steps .x{color:var(--muted);font-size:.92rem;line-height:1.6;margin-top:.2rem}
+  code{font-family:var(--mono);font-size:.86em;color:var(--teal);background:rgba(79,227,193,.09);border:1px solid rgba(79,227,193,.16);border-radius:5px;padding:.08em .38em}
+
+  footer{border-top:1px solid var(--hairline);padding-block:2.75rem 3.5rem;color:var(--dim);font-size:var(--f-small)}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:.6rem 1.5rem;justify-content:space-between}
+
+  a{color:var(--teal)}
+  a:focus-visible,li:focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:4px}
+
+  @media (max-width:960px){
+    .palette{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .notes{grid-template-columns:1fr}
+  }
+  @media (max-width:860px){
+    .hero .wrap{grid-template-columns:1fr;gap:3rem}
+    .hero-device{justify-self:center;width:min(72%,300px)}
+    .spec-row{grid-template-columns:1fr}
+    .spec-meta{text-align:left}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+
+<header class="hero">
+  <canvas id="aurora" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <div class="hero-copy">
+      <p class="label">Galaxy S23 Ultra · 1440 × 3088</p>
+      <h1>Obsidian<span class="b">Aurora</span></h1>
+      <p class="lede">A dark theme cut for one panel. Near-black obsidian ground, an iridescent
+        curtain of teal, violet and rose, and frosted glass over the top.</p>
+      <div class="spec">
+        <span>4 wallpapers</span><span>3 widgets</span><span>10 colour tokens</span><span>AMOLED-true black</span>
+      </div>
+    </div>
+    <div class="hero-device">
+      <div class="device"><img src="data:image/jpeg;base64,{{S_LOCK}}" alt="Obsidian Aurora lock screen on a Galaxy S23 Ultra"></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="wrap">
+    <div class="head">
+      <p class="label">Assembled</p>
+      <h2>Three screens</h2>
+      <p>Wallpaper, widgets, icons and system tint working as one set — not a wallpaper with
+        decoration parked on top.</p>
+    </div>
+    <div class="screens">
+      <figure class="screen" style="margin:0">
+        <div class="device"><img src="data:image/jpeg;base64,{{S_LOCK}}" alt="Lock screen"></div>
+        <figcaption>
+          <span class="cap">Lock</span>
+          <span class="sub">The top 45% stays near-black, so the clock and notification stack never
+            fight the aurora for contrast.</span>
+        </figcaption>
+      </figure>
+      <figure class="screen" style="margin:0">
+        <div class="device"><img src="data:image/jpeg;base64,{{S_HOME}}" alt="Home screen"></div>
+        <figcaption>
+          <span class="cap">Home</span>
+          <span class="sub">Curtains pushed low and dimmed, so a 4 × 4 grid plus dock keeps its
+            footing all the way down the page.</span>
+        </figcaption>
+      </figure>
+      <figure class="screen" style="margin:0">
+        <div class="device"><img src="data:image/jpeg;base64,{{S_QUICK}}" alt="Quick panel"></div>
+        <figcaption>
+          <span class="cap">Quick panel</span>
+          <span class="sub">A 62% scrim over a 34px blur — enough to read the tiles, not so much that
+            the aurora disappears behind them.</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="head">
+      <p class="label">Colour</p>
+      <h2>The palette</h2>
+      <p>Paste these into Theme Park's palette editor and the system UI matches the wallpaper exactly.
+        The neutrals carry a slight blue bias so they sit with the accents instead of under them.</p>
+    </div>
+    <div class="palette">
+      <div class="sw"><div class="chip" style="background:#07080B"></div><span class="hex">#07080B</span><span class="role">Base — system background</span></div>
+      <div class="sw"><div class="chip" style="background:#0E1116"></div><span class="hex">#0E1116</span><span class="role">Surface — cards, sheets</span></div>
+      <div class="sw"><div class="chip" style="background:#151A21"></div><span class="hex">#151A21</span><span class="role">Raised — panel tiles</span></div>
+      <div class="sw"><div class="chip" style="background:#232A34"></div><span class="hex">#232A34</span><span class="role">Outline — dividers</span></div>
+      <div class="sw"><div class="chip" style="background:#2B2C6B"></div><span class="hex">#2B2C6B</span><span class="role">Indigo — deep shadow tint</span></div>
+      <div class="sw"><div class="chip" style="background:#4FE3C1;box-shadow:0 0 34px -6px rgba(79,227,193,.55)"></div><span class="hex">#4FE3C1</span><span class="role">Primary — toggles, active states</span></div>
+      <div class="sw"><div class="chip" style="background:#7C6CF5;box-shadow:0 0 34px -6px rgba(124,108,245,.55)"></div><span class="hex">#7C6CF5</span><span class="role">Secondary — chips, accents</span></div>
+      <div class="sw"><div class="chip" style="background:#E85A9B;box-shadow:0 0 34px -6px rgba(232,90,155,.5)"></div><span class="hex">#E85A9B</span><span class="role">Tertiary — badges, alerts</span></div>
+      <div class="sw"><div class="chip" style="background:#F2F4F7"></div><span class="hex">#F2F4F7</span><span class="role">Text — primary</span></div>
+      <div class="sw"><div class="chip" style="background:#8B93A1"></div><span class="hex">#8B93A1</span><span class="role">Text — secondary</span></div>
+    </div>
+    <div class="ramp">
+      <div class="ramp-bar"></div>
+      <div class="ramp-stops">
+        <span>#3BD9C4</span><span>#4FE3C1</span><span>#5AC8E8</span><span>#7C6CF5</span><span>#B364E0</span><span>#E85A9B</span>
+      </div>
+      <p class="role" style="color:var(--muted);font-size:.88rem;margin-top:.75rem">The ramp each curtain walks along, left edge to right. Re-colour this and the whole theme follows.</p>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="head">
+      <p class="label">Engineering</p>
+      <h2>Built for this panel</h2>
+      <p>Four decisions that are specific to the S23 Ultra's display, and the reason the gradients
+        stay clean where most dark wallpapers fall apart.</p>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <div class="k" style="background:var(--teal)"></div>
+        <h3>Light accumulates in linear space</h3>
+        <p>Glow blended in gamma space goes chalky and grey. Every ribbon is summed in linear light
+          and tone-mapped once at the end, so the cores roll into white the way real emitted light
+          does.</p>
+      </div>
+      <div class="note">
+        <div class="k" style="background:var(--cyan)"></div>
+        <h3>Dithered against banding</h3>
+        <p>Dark gradients contour badly at 8 bits — you get visible rings. Each render gets
+          triangular-PDF dither at ±0.5 LSB before quantisation, which trades the rings for noise
+          far below the visible floor.</p>
+      </div>
+      <div class="note">
+        <div class="k" style="background:var(--violet)"></div>
+        <h3>True black is free</h3>
+        <p>On AMOLED an unlit pixel draws nothing, so the base sits at <code>#07080B</code> and the
+          Always-On variant is pure black with a single filament. It lights under a tenth of the
+          screen.</p>
+      </div>
+      <div class="note">
+        <div class="k" style="background:var(--rose)"></div>
+        <h3>Composition follows the UI</h3>
+        <p>Each variant is composed around what sits on it: a dark ceiling above the lock clock, a
+          sharp lower edge that keeps the shortcut row clean, and a dimmer curtain under the icon
+          grid.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="head">
+      <p class="label">Assets</p>
+      <h2>Four wallpapers</h2>
+      <p>All rendered at native 1440 × 3088. No cropping needed — they match the panel exactly.</p>
+    </div>
+    <div class="walls">
+      <figure class="wall" style="margin:0">
+        <div class="frame"><img src="data:image/jpeg;base64,{{W_LOCK}}" alt="Lock wallpaper"></div>
+        <span class="n">Lock</span>
+        <span class="d">Dark ceiling, curtains through the lower third.</span>
+      </figure>
+      <figure class="wall" style="margin:0">
+        <div class="frame"><img src="data:image/jpeg;base64,{{W_HOME}}" alt="Home wallpaper"></div>
+        <span class="n">Home</span>
+        <span class="d">Pushed low and dimmed for icon contrast.</span>
+      </figure>
+      <figure class="wall" style="margin:0">
+        <div class="frame"><img src="data:image/jpeg;base64,{{W_AMBIENT}}" alt="Ambient wallpaper"></div>
+        <span class="n">Ambient</span>
+        <span class="d">Full-bleed. App drawer, or anywhere else.</span>
+      </figure>
+      <figure class="wall" style="margin:0">
+        <div class="frame"><img src="data:image/jpeg;base64,{{W_AOD}}" alt="Always-On Display wallpaper"></div>
+        <span class="n">Always-On</span>
+        <span class="d">Pure black, one filament, minimal draw.</span>
+      </figure>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="head">
+      <p class="label">Type</p>
+      <h2>Three faces</h2>
+      <p>All open-licence and free. Jura carries the clock, Outfit does the talking, Geist Mono
+        handles anything that reads as data.</p>
+    </div>
+    <div class="type">
+      <div class="spec-row">
+        <div class="sample s-jura">09:41</div>
+        <div class="spec-meta">Jura Light<br>Clock · Battery · Temp</div>
+      </div>
+      <div class="spec-row">
+        <div class="sample s-outfit">Your theme is ready to apply</div>
+        <div class="spec-meta">Outfit<br>Titles · Labels · Body</div>
+      </div>
+      <div class="spec-row">
+        <div class="sample s-mono">TUESDAY, 13 AUGUST</div>
+        <div class="spec-meta">Geist Mono<br>Metadata · Small caps</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="head">
+      <p class="label">Install</p>
+      <h2>Setting it up</h2>
+      <p>Nothing here needs root and nothing touches system files — it all runs through Samsung's own
+        customisation tools. The first four steps get you most of the way.</p>
+    </div>
+    <ol class="steps">
+      <li><div><div class="t">Switch the panel to WQHD+</div><div class="x">Display → Screen resolution → WQHD+. The wallpapers are cut for exactly 1440 × 3088.</div></div></li>
+      <li><div><div class="t">Set the wallpapers</div><div class="x">Wallpaper and style → Gallery. Turn <em>Wallpaper services</em> off first, and decline the crop — the files already fit.</div></div></li>
+      <li><div><div class="t">Turn off the lock-screen dim</div><div class="x">The gradient is already doing that work; One UI's dim just muddies it.</div></div></li>
+      <li><div><div class="t">Paste the palette into Theme Park</div><div class="x">Good Lock → Theme Park → Create theme. Override the nine slots above and set it to dark-only, then reboot.</div></div></li>
+      <li><div><div class="t">Rebuild the widgets in KWGT</div><div class="x"><code>widgets/placement.json</code> carries every font, size, colour and binding, with coordinates in both pixels and resolution-independent fractions.</div></div></li>
+      <li><div><div class="t">Tune the rest with Good Lock</div><div class="x">LockStar for the lock screen, ClockFace for Always-On, QuickStar for the quick panel, Home Up for the grid.</div></div></li>
+    </ol>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Obsidian Aurora — Galaxy S23 Ultra</span>
+    <span>Rendered at 1440 × 3088 · linear-light, dithered</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var c = document.getElementById("aurora");
+  if(!c) return;
+  var ctx = c.getContext("2d");
+  var Wc = 760, Hc = 1120;           // upscaled ~2x by CSS, then blurred
+  c.width = Wc; c.height = Hc;
+
+  var RAMP = [[59,217,196],[79,227,193],[90,200,232],[124,108,245],[179,100,224],[232,90,155]];
+  function ramp(t){
+    t = Math.max(0, Math.min(1, t)) * (RAMP.length - 1);
+    var i = Math.min(RAMP.length - 2, Math.floor(t)), f = t - i;
+    var a = RAMP[i], b = RAMP[i+1];
+    return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f];
+  }
+
+  var N = 210, step = Wc / N;
+  var seeds = [];
+  for(var i=0;i<N;i++) seeds.push({a:Math.random()*6.283, b:Math.random()*6.283, c:0.6+Math.random()*0.9});
+
+  function frame(t){
+    ctx.clearRect(0,0,Wc,Hc);
+    ctx.globalCompositeOperation = "lighter";
+    for(var i=0;i<N;i++){
+      var x = i*step, u = i/N, s = seeds[i];
+      // wavy lower edge, same idea as the wallpaper's ribbon centreline
+      var edge = Hc*0.80 + Math.sin(u*3.1 + t*0.16)*Hc*0.055 + Math.sin(u*7.4 + t*0.09)*Hc*0.022;
+      var amp = 0.34 + 0.66*Math.abs(Math.sin(s.a + t*0.20*s.c) * Math.sin(s.b + t*0.11));
+      var len = Hc*(0.30 + 0.34*amp);
+      var col = ramp(u);
+      var g = ctx.createLinearGradient(0, edge-len, 0, edge);
+      g.addColorStop(0,   "rgba("+(col[0]|0)+","+(col[1]|0)+","+(col[2]|0)+",0)");
+      g.addColorStop(0.72,"rgba("+(col[0]|0)+","+(col[1]|0)+","+(col[2]|0)+","+(0.16*amp).toFixed(3)+")");
+      g.addColorStop(1,   "rgba("+(col[0]|0)+","+(col[1]|0)+","+(col[2]|0)+","+(0.40*amp).toFixed(3)+")");
+      ctx.fillStyle = g;
+      ctx.fillRect(x, edge-len, step+1.4, len);
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce){ frame(0); return; }
+
+  var t0 = null, raf = null;
+  function loop(ts){
+    if(t0 === null) t0 = ts;
+    frame((ts - t0)/1000);
+    raf = requestAnimationFrame(loop);
+  }
+  raf = requestAnimationFrame(loop);
+
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden){ if(raf){ cancelAnimationFrame(raf); raf = null; } }
+    else if(!raf){ t0 = null; raf = requestAnimationFrame(loop); }
+  });
+})();
+</script>

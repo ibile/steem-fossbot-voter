@@ -1,0 +1,72 @@
+{
+  "$comment": "Obsidian Aurora — KWGT widget specs. Coordinates are for a 1440x3088 (WQHD+) panel; 'frac' values are resolution-independent and are what you should use if you run the phone at FHD+ (1080x2340).",
+  "canvas": { "width": 1440, "height": 3088, "density": "~500dpi", "aspect": "19.3:9" },
+
+  "fonts": {
+    "display": { "family": "Jura", "weights": ["Light", "Medium"], "use": "clock digits, battery percentage, temperature" },
+    "ui":      { "family": "Outfit", "weights": ["Regular", "Bold"], "use": "titles, app labels, tile labels" },
+    "mono":    { "family": "Geist Mono", "weights": ["Regular"], "use": "small caps metadata, date line" },
+    "note": "All three are open-licence (OFL) and free on Google Fonts. Install them via Settings > Display > Font size and style > Font styles, or point KWGT at the .ttf directly."
+  },
+
+  "widgets": {
+    "clock": {
+      "file": "clock.png",
+      "anchor": "top-left",
+      "position": { "x": 108, "y": 300, "frac": { "x": 0.075, "y": 0.097 } },
+      "layers": [
+        { "type": "text", "content": "$df(hh)$", "font": "Jura-Light", "size_px": 320, "color": "#F2F4F7", "alpha": 93 },
+        { "type": "text", "content": "$df(mm)$", "font": "Jura-Medium", "size_px": 320, "color": "#4FE3C1", "alpha": 98, "offset_y_px": 360 },
+        { "type": "rect", "role": "hairline", "width_px": 430, "height_px": 3, "color": "#232A34", "offset_y_px": 770 },
+        { "type": "circle", "role": "accent-dot", "diameter_px": 16, "color": "#E85A9B", "offset_y_px": 770 },
+        { "type": "text", "content": "$df(EEEE, d MMMM)$", "font": "GeistMono-Regular", "size_px": 34, "color": "#8B93A1", "alpha": 88, "letter_spacing": 2, "transform": "uppercase", "offset_y_px": 802 }
+      ],
+      "shadow": { "blur_px": 26, "color": "#000000", "alpha": 70 }
+    },
+
+    "weather": {
+      "file": "weather.png",
+      "anchor": "top-left",
+      "position": { "x": 108, "y": 1090, "frac": { "x": 0.075, "y": 0.353 } },
+      "panel": { "width_px": 620, "height_px": 210, "corner_px": 46, "fill": "#141A22", "fill_alpha": 59, "border": "#FFFFFF", "border_alpha": 16, "border_px": 2 },
+      "layers": [
+        { "type": "glyph", "role": "condition", "color": "#4FE3C1", "size_px": 92, "offset_x_px": 62 },
+        { "type": "text", "content": "$wi(temp)$°", "font": "Jura-Light", "size_px": 108, "color": "#F2F4F7", "offset_x_px": 236 },
+        { "type": "text", "content": "$wi(cond)$", "font": "Outfit-Regular", "size_px": 36, "color": "#8B93A1", "offset_x_px": 432 },
+        { "type": "text", "content": "H $wi(high)$  L $wi(low)$", "font": "GeistMono-Regular", "size_px": 26, "color": "#8B93A1", "alpha": 69, "offset_x_px": 434 }
+      ]
+    },
+
+    "battery": {
+      "file": "battery.png",
+      "anchor": "top-right",
+      "position": { "x": 984, "y": 300, "frac": { "x": 0.683, "y": 0.097 } },
+      "arc": {
+        "diameter_px": 360, "stroke_px": 16, "start_deg": 135, "sweep_deg": 270,
+        "track": { "color": "#232A34", "alpha": 75 },
+        "progress_gradient": ["#3BD9C4", "#4FE3C1", "#5AC8E8", "#7C6CF5"],
+        "bind": "$bi(level)$"
+      },
+      "layers": [
+        { "type": "text", "content": "$bi(level)$", "font": "Jura-Light", "size_px": 92, "color": "#F2F4F7" },
+        { "type": "text", "content": "BATTERY", "font": "GeistMono-Regular", "size_px": 22, "color": "#8B93A1", "letter_spacing": 3 }
+      ]
+    }
+  },
+
+  "screen_layout": {
+    "lock": {
+      "clock":        { "x": 108, "y": 300 },
+      "weather":      { "x": 108, "y": 1090 },
+      "notifications":{ "x": 108, "y": 1420, "width": 1224 },
+      "shortcuts":    { "left": { "x": 150, "y": 2740 }, "right": { "x": 1140, "y": 2740 }, "size": 150 }
+    },
+    "home": {
+      "clock":   { "x": 96, "y": 230, "scale": 0.72 },
+      "battery": { "x": 984, "y": 300 },
+      "weather": { "x": 96, "y": 900, "scale": 0.95 },
+      "grid":    { "columns": 4, "rows": 4, "icon_px": 216, "margin_px": 96, "gap_px": 128, "top_px": 1240, "row_pitch_px": 344 },
+      "dock":    { "x": 72, "y": 2720, "width": 1296, "height": 268, "corner_px": 64, "icons": 5, "icon_px": 172 }
+    }
+  }
+}
