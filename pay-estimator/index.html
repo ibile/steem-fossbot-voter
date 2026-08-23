@@ -379,8 +379,15 @@ details.acc .card-bd{padding-top:0}
           <select id="s-slipdow" style="width:132px;flex:none"></select>
         </div>
         <div class="field">
-          <label for="s-cutdow">Cut-off<span class="fh">The last one before the payslip</span></label>
+          <label for="s-cutdow">Cut-off<span class="fh">The last one before the payslip &mdash; the same weekday means a full week before</span></label>
           <select id="s-cutdow" style="width:132px;flex:none"></select>
+        </div>
+        <div class="field">
+          <label for="s-paylabel">Each period is<span class="fh" id="labelHint"></span></label>
+          <select id="s-paylabel" style="width:172px;flex:none">
+            <option value="start">Named for its first month</option>
+            <option value="payday">Named for its payday</option>
+          </select>
         </div>
         <div class="field">
           <label for="s-payfri">Weekend payday<span class="fh">Paid the Friday before if it falls on a weekend</span></label>
@@ -512,7 +519,8 @@ function defaults(){
   return {
     settings:{
       baseRate:12.00, holidayRate:12.00,
-      payMode:"cutoff", paydayDom:21, payslipDow:3, cutoffDow:0, paydayFriday:false,
+      payMode:"cutoff", paydayDom:21, payslipDow:3, cutoffDow:3, paydayFriday:false,
+      payLabel:"start", rev:2,
       periodStart:1,
       taxCode:"1257L", scottish:false,
       niPT:1048, niUEL:4189, niRate:8, niUpperRate:2,
@@ -541,8 +549,21 @@ function load(){
       var base = defaults();
       DB = {settings:Object.assign(base.settings, d.settings), types:d.types, shifts:d.shifts};
       S = DB.settings;
+      migrate(d.settings);
     }
   }catch(e){}
+}
+/* rev 2: the cut-off is the Wednesday a week before the payslip, and a period
+   is named for the month it starts in rather than the month it is paid. */
+function migrate(stored){
+  /* judge by what was actually saved: the merge above has already filled
+     rev in from the defaults, so S.rev is never the old value */
+  if(!stored || stored.rev >= 2) return;
+  var fresh = defaults().settings;
+  S.cutoffDow = fresh.cutoffDow;
+  S.payLabel = fresh.payLabel;
+  S.rev = 2;
+  save();
 }
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(DB)); }
@@ -597,10 +618,16 @@ function payDates(y, m){
   }
   return {payday:paid, nominal:payday, slip:slip, cutoff:cutoff};
 }
+/* Which month's pay a period belongs to: "start" names it for the month the
+   work starts in (paid the month after), "payday" for the month it lands. */
+function closingMonth(){
+  return view.getMonth() + (S.payLabel === "payday" ? 0 : 1);
+}
 function period(){
   var y = view.getFullYear(), m = view.getMonth();
   if(S.payMode === "cutoff"){
-    var end = payDates(y, m).cutoff, prev = payDates(y, m-1).cutoff;
+    var close = closingMonth();
+    var end = payDates(y, close).cutoff, prev = payDates(y, close-1).cutoff;
     return {start:new Date(prev.getFullYear(), prev.getMonth(), prev.getDate()+1), end:end};
   }
   var sd = parseInt(S.periodStart,10) || 1;
@@ -745,7 +772,7 @@ function render(){
   var p = c.period;
 
   $("periodLbl").textContent = MONTHS[view.getMonth()] + " " + view.getFullYear();
-  var K = payDates(view.getFullYear(), view.getMonth());
+  var K = payDates(view.getFullYear(), closingMonth());
   $("hdRange").textContent = rangeLabel(p) +
     (S.payMode === "cutoff" ? " · paid " + dayLabel(K.payday) :
      S.periodStart > 1 ? " · paid for " + MONTHS[view.getMonth()] : "");
@@ -1270,6 +1297,9 @@ function renderSetup(){
   num("s-pday", +S.periodStart > 1 ? S.periodStart : 21);
   num("s-payday", S.paydayDom);
   fillDows("s-slipdow", S.payslipDow); fillDows("s-cutdow", S.cutoffDow);
+  $("s-paylabel").value = S.payLabel || "start";
+  $("labelHint").textContent = S.payLabel === "payday"
+    ? "August = the pay landing in August" : "August = the run of shifts starting in August";
   setSwitch("s-payfri", S.paydayFriday);
   $("periodHint").textContent = rangeLabel(period());
   num("s-taxcode", S.taxCode);
@@ -1406,6 +1436,7 @@ $("s-payday").addEventListener("input", function(){
 });
 $("s-slipdow").addEventListener("change", function(){ S.payslipDow = +this.value; save(); render(); $("periodHint").textContent = rangeLabel(period()); });
 $("s-cutdow").addEventListener("change", function(){ S.cutoffDow = +this.value; save(); render(); $("periodHint").textContent = rangeLabel(period()); });
+$("s-paylabel").addEventListener("change", function(){ S.payLabel = this.value; save(); renderSetup(); render(); });
 $("s-pday").addEventListener("input", function(){
   var v = parseInt(this.value,10);
   if(!v || v < 1) v = 1; if(v > 28) v = 28;
@@ -1505,8 +1536,11 @@ load();
    already earning next month's pay */
 if(S.payMode === "cutoff"){
   var t0 = new Date(); t0.setHours(0,0,0,0);
-  for(var g=0; g<3 && t0 > payDates(view.getFullYear(), view.getMonth()).cutoff; g++){
-    view.setMonth(view.getMonth()+1);
+  for(var g=0; g<24; g++){
+    var p0 = period();
+    if(t0 > p0.end) view.setMonth(view.getMonth()+1);
+    else if(t0 < p0.start) view.setMonth(view.getMonth()-1);
+    else break;
   }
 }
 renderPhoto();
