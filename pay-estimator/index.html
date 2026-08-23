@@ -1,0 +1,1250 @@
+<title>Rota to Payslip</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#E9ECF3; --surface:#FFFFFF; --surface-2:#F5F7FA; --sunken:#DFE3EC;
+  --band:#1D2A56; --band-ink:#EEF2FF;
+  --ink:#141A2C; --ink-2:#3A4258; --muted:#646D89; --hair:#D3D9E6; --hair-2:#E4E8F1;
+  --accent:#2E4BA8; --accent-soft:#E5EAF8;
+  --pos:#0B7355; --neg:#9A2E43; --warn:#9C5A0C;
+  --chip-s:58%; --chip-l:34%; --chip-bg-l:52%; --chip-bg-a:.13; --chip-bd-a:.34;
+  --shadow:0 1px 2px rgba(20,26,44,.06), 0 8px 24px -12px rgba(20,26,44,.22);
+  --sheet-shadow:0 -8px 40px rgba(20,26,44,.28);
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1220; --surface:#161C2C; --surface-2:#1C2334; --sunken:#101625;
+    --band:#283562; --band-ink:#E9EEFF;
+    --ink:#E8ECF7; --ink-2:#C3CADC; --muted:#98A2BF; --hair:#2C3549; --hair-2:#232B3D;
+    --accent:#8CA4FF; --accent-soft:#20294180;
+    --pos:#43C398; --neg:#EE8296; --warn:#E0A542;
+    --chip-s:62%; --chip-l:72%; --chip-bg-l:60%; --chip-bg-a:.17; --chip-bd-a:.4;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    --sheet-shadow:0 -8px 40px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"] .cell.unpaid{--chip-l:62%}
+:root[data-theme="dark"]{
+  --ground:#0D1220; --surface:#161C2C; --surface-2:#1C2334; --sunken:#101625;
+  --band:#283562; --band-ink:#E9EEFF;
+  --ink:#E8ECF7; --ink-2:#C3CADC; --muted:#98A2BF; --hair:#2C3549; --hair-2:#232B3D;
+  --accent:#8CA4FF; --accent-soft:#20294180;
+  --pos:#43C398; --neg:#EE8296; --warn:#E0A542;
+  --chip-s:62%; --chip-l:72%; --chip-bg-l:60%; --chip-bg-a:.17; --chip-bd-a:.4;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  --sheet-shadow:0 -8px 40px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; min-height:100vh; background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none;padding:0}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:6px}
+.num{font-family:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric:tabular-nums}
+.wrap{max-width:600px;margin:0 auto;padding:0 14px 108px}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:40;background:var(--band);color:var(--band-ink);box-shadow:var(--shadow)}
+.hd{max-width:600px;margin:0 auto;padding:10px 14px 14px}
+.hd-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{font-family:Archivo, sans-serif;font-weight:700;font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.72}
+.navbtn{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--band-ink);opacity:.8;font-size:17px;line-height:1}
+.navbtn:hover{opacity:1;background:rgba(255,255,255,.1)}
+.period{display:flex;align-items:center;gap:2px}
+.period-lbl{font-family:Archivo,sans-serif;font-weight:600;font-size:15px;min-width:132px;text-align:center}
+.headline{margin-top:10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.headline .lbl{font-size:11px;letter-spacing:.13em;text-transform:uppercase;opacity:.68;font-weight:500}
+.net{font-family:Archivo,sans-serif;font-variant-numeric:tabular-nums;font-weight:800;font-size:40px;line-height:1;letter-spacing:-.02em;display:block;margin-top:3px}
+.net small{font-size:22px;font-weight:600;opacity:.7}
+.hd-meta{text-align:right;font-size:12px;opacity:.75;line-height:1.5}
+.hd-range{font-size:11px;opacity:.6;margin-top:6px;letter-spacing:.02em}
+
+/* ---------- tabs ---------- */
+nav.tabs{position:sticky;top:var(--hdh,0px);z-index:39;background:var(--ground);border-bottom:1px solid var(--hair);margin-bottom:14px}
+.tabs-in{max-width:600px;margin:0 auto;padding:0 14px;display:flex;gap:2px}
+.tab{flex:1;padding:11px 4px 9px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;letter-spacing:.01em}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.panel[hidden]{display:none}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+.card-hd{padding:11px 14px;border-bottom:1px solid var(--hair-2);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card-hd h2{margin:0;font-family:Archivo,sans-serif;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.card-bd{padding:14px}
+.band{background:var(--band);color:var(--band-ink);padding:9px 14px;display:flex;justify-content:space-between;align-items:center}
+.band h2{margin:0;font-family:Archivo,sans-serif;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.band .v{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;font-weight:600}
+.hint{color:var(--muted);font-size:12.5px;line-height:1.5}
+.hint a{color:var(--accent)}
+
+/* ---------- calendar ---------- */
+.dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:0 10px 6px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:0 10px 12px}
+.cell{aspect-ratio:1/1.14;border:1px solid var(--hair-2);border-radius:9px;background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 2px 3px;gap:2px;transition:transform .09s ease, border-color .12s ease}
+.cell:active{transform:scale(.95)}
+.cell.blank{visibility:hidden}
+.cell .d{font-size:11px;color:var(--muted);font-weight:600;font-family:"IBM Plex Mono",monospace}
+.cell.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.cell.today .d{color:var(--accent)}
+.cell.past{background:var(--sunken)}
+.cell.unpaid,.lgd.unpaid,.pick.unpaid,.trow.unpaid{--chip-s:6%;--chip-l:44%;--chip-bg-a:.1}
+:root:not([data-theme="light"]) .cell.unpaid{--chip-l:62%}
+.cell.filled{background:hsl(var(--h) var(--chip-s) var(--chip-bg-l) / var(--chip-bg-a));border-color:hsl(var(--h) var(--chip-s) var(--chip-bg-l) / var(--chip-bd-a))}
+.cell .code{font-family:Archivo,sans-serif;font-weight:700;font-size:14px;line-height:1.05;color:hsl(var(--h) var(--chip-s) var(--chip-l))}
+.cell .hrs{font-size:9.5px;color:var(--muted);font-family:"IBM Plex Mono",monospace;line-height:1}
+.calfoot{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 14px;border-top:1px solid var(--hair-2);background:var(--surface-2);font-size:12px;color:var(--muted)}
+.calfoot b{color:var(--ink);font-weight:600;font-family:"IBM Plex Mono",monospace}
+.legend{display:flex;flex-wrap:wrap;gap:5px;padding:10px 12px 12px}
+.lgd{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);padding:3px 8px;border-radius:20px;background:hsl(var(--h) var(--chip-s) var(--chip-bg-l) / var(--chip-bg-a))}
+.lgd i{font-style:normal;font-family:Archivo,sans-serif;font-weight:700;color:hsl(var(--h) var(--chip-s) var(--chip-l));font-size:11px}
+
+/* ---------- payslip rows ---------- */
+.rows{padding:2px 0}
+.row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 14px;border-bottom:1px dashed var(--hair-2)}
+.row:last-child{border-bottom:none}
+.row .nm{font-size:13.5px}
+.row .sub{display:block;font-size:11px;color:var(--muted);font-family:"IBM Plex Mono",monospace;margin-top:1px}
+.row .amt{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:14px;font-weight:500;white-space:nowrap}
+.row.total{background:var(--surface-2);border-top:1px solid var(--hair);border-bottom:none}
+.row.total .nm{font-family:Archivo,sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+.row.total .amt{font-weight:600;font-size:15px}
+.neg .amt{color:var(--neg)}
+.netband{background:var(--band);color:var(--band-ink);padding:14px;display:flex;align-items:center;justify-content:space-between}
+.netband .nm{font-family:Archivo,sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700}
+.netband .amt{font-family:Archivo,sans-serif;font-variant-numeric:tabular-nums;font-size:26px;font-weight:800;letter-spacing:-.01em}
+.empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:13px}
+
+/* ---------- forms ---------- */
+.field{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair-2)}
+.field:last-child{border-bottom:none}
+.field > label{font-size:13.5px;flex:1}
+.field .fh{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+input[type=text],input[type=number],select,textarea{
+  background:var(--surface-2);border:1px solid var(--hair);border-radius:8px;padding:7px 9px;
+  font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-variant-numeric:tabular-nums;width:100%;
+}
+input[type=number]{-moz-appearance:textfield}
+input.inp-s{width:104px;flex:none;text-align:right}
+input.inp-xs{width:74px;flex:none;text-align:right}
+textarea{font-size:13px;line-height:1.5;min-height:110px;resize:vertical}
+select{font-family:"IBM Plex Sans",sans-serif;padding-right:26px}
+.pre{position:relative;display:flex;align-items:center;flex:none;width:104px}
+.pre span{position:absolute;left:9px;color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:13px;pointer-events:none}
+.pre input{padding-left:20px;text-align:right}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;border-radius:9px;border:1px solid var(--hair);background:var(--surface-2);font-size:13.5px;font-weight:600;color:var(--ink)}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.08);color:#fff}
+.btn.ghost{background:none}
+.btn.danger:hover{border-color:var(--neg);color:var(--neg)}
+.btn.sm{padding:6px 10px;font-size:12.5px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.switch{position:relative;width:44px;height:25px;border-radius:20px;background:var(--sunken);border:1px solid var(--hair);flex:none;transition:background .15s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+.switch[aria-checked="true"]{background:var(--accent);border-color:var(--accent)}
+.switch[aria-checked="true"]::after{transform:translateX(19px)}
+details.acc{border-top:1px solid var(--hair-2)}
+details.acc > summary{padding:11px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);list-style:none;display:flex;justify-content:space-between;align-items:center}
+details.acc > summary::-webkit-details-marker{display:none}
+details.acc > summary::after{content:"+";color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:16px}
+details.acc[open] > summary::after{content:"–"}
+details.acc .card-bd{padding-top:0}
+
+/* ---------- shift type editor ---------- */
+.tlist{display:flex;flex-direction:column;gap:8px}
+.trow{border:1px solid var(--hair);border-radius:10px;padding:9px 10px;background:var(--surface-2)}
+.trow-hd{display:flex;align-items:center;gap:8px}
+.tcode{font-family:Archivo,sans-serif;font-weight:700;font-size:12px;padding:3px 7px;border-radius:6px;color:hsl(var(--h) var(--chip-s) var(--chip-l));background:hsl(var(--h) var(--chip-s) var(--chip-bg-l) / var(--chip-bg-a));flex:none;min-width:34px;text-align:center}
+.trow-hd input.nm{flex:1;background:none;border:none;padding:2px 0;font-family:"IBM Plex Sans",sans-serif;font-size:13.5px;font-weight:600}
+.trow-gr{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
+.trow-gr label{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:2px;font-weight:600}
+.trow-gr input,.trow-gr select{padding:5px 7px;font-size:12.5px;text-align:left;width:100%}
+
+/* ---------- sheet ---------- */
+.scrim{position:fixed;inset:0;background:rgba(10,14,26,.5);z-index:60;opacity:0;pointer-events:none;transition:opacity .18s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:61;background:var(--surface);border-radius:18px 18px 0 0;box-shadow:var(--sheet-shadow);
+  transform:translateY(101%);transition:transform .22s cubic-bezier(.32,.72,0,1);max-height:88vh;overflow-y:auto;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+.sheet.on{transform:translateY(0)}
+.sheet-in{max-width:600px;margin:0 auto;padding:14px}
+.grab{width:38px;height:4px;border-radius:4px;background:var(--hair);margin:8px auto 4px}
+.sheet h3{margin:2px 0 2px;font-family:Archivo,sans-serif;font-size:17px;font-weight:700}
+.sheet .sub{color:var(--muted);font-size:12.5px;margin-bottom:12px}
+.picks{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+.pick{display:flex;align-items:center;gap:9px;padding:10px;border-radius:10px;border:1px solid var(--hair);background:var(--surface-2);text-align:left}
+.pick[aria-pressed="true"]{border-color:hsl(var(--h) var(--chip-s) var(--chip-bg-l));background:hsl(var(--h) var(--chip-s) var(--chip-bg-l) / var(--chip-bg-a))}
+.pick i{font-style:normal;font-family:Archivo,sans-serif;font-weight:700;font-size:13px;color:hsl(var(--h) var(--chip-s) var(--chip-l));min-width:26px}
+.pick > span{display:flex;flex-direction:column;gap:1px;min-width:0}
+.pick .pn{display:block;font-size:13px;font-weight:600;line-height:1.2}
+.pick .pp{display:block;font-size:11px;color:var(--muted);font-family:"IBM Plex Mono",monospace}
+.stepper{display:flex;align-items:center;gap:0;border:1px solid var(--hair);border-radius:9px;overflow:hidden;background:var(--surface-2)}
+.stepper button{width:40px;height:38px;font-size:18px;color:var(--muted);font-family:"IBM Plex Mono",monospace}
+.stepper button:hover{background:var(--sunken);color:var(--accent)}
+.stepper input{border:none;background:none;text-align:center;width:64px;padding:0;font-size:15px;font-weight:600}
+@media (prefers-reduced-motion: reduce){*{transition-duration:.01ms !important;animation-duration:.01ms !important}}
+
+/* ---------- misc ---------- */
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:80;background:var(--band);color:var(--band-ink);
+  padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.sheet.on ~ .toast{bottom:auto;top:calc(var(--hdh,90px) + 14px)}
+.rota-img{width:100%;border-radius:10px;border:1px solid var(--hair);display:block;background:var(--sunken);max-height:230px;object-fit:contain}
+.imgwrap{position:relative}
+.imgwrap .x{position:absolute;top:7px;right:7px;background:rgba(13,18,32,.78);color:#fff;width:28px;height:28px;border-radius:50%;font-size:15px;display:grid;place-items:center}
+.zoom{position:fixed;inset:0;z-index:70;background:rgba(8,11,20,.94);display:none;place-items:center;padding:10px}
+.zoom.on{display:grid}
+.zoom img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
+.prev{max-height:190px;overflow-y:auto;border:1px solid var(--hair);border-radius:9px;background:var(--surface-2);margin-top:10px}
+.prev .r{display:flex;justify-content:space-between;padding:5px 10px;font-size:12.5px;border-bottom:1px solid var(--hair-2);font-family:"IBM Plex Mono",monospace}
+.prev .r:last-child{border-bottom:none}
+.prev .r span:last-child{color:var(--muted)}
+.warnbox{background:color-mix(in srgb, var(--warn) 12%, transparent);border:1px solid color-mix(in srgb, var(--warn) 34%, transparent);color:var(--warn);padding:9px 11px;border-radius:9px;font-size:12.5px;margin-top:10px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.split > div{padding:11px 14px}
+.split > div + div{border-left:1px solid var(--hair-2)}
+.split .k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.split .v{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.split .v.pos{color:var(--pos)}
+</style>
+
+<header>
+  <div class="hd">
+    <div class="hd-top">
+      <span class="brand">Rota &rarr; Payslip</span>
+      <div class="period">
+        <button class="navbtn" id="prevM" aria-label="Previous month">&#8249;</button>
+        <span class="period-lbl" id="periodLbl">&nbsp;</span>
+        <button class="navbtn" id="nextM" aria-label="Next month">&#8250;</button>
+      </div>
+    </div>
+    <div class="headline">
+      <div>
+        <span class="lbl">Estimated take-home</span>
+        <span class="net num" id="netBig">&pound;0<small>.00</small></span>
+      </div>
+      <div class="hd-meta">
+        <div><span class="num" id="hdShifts">0</span> shifts</div>
+        <div><span class="num" id="hdHours">0</span> hrs</div>
+      </div>
+    </div>
+    <div class="hd-range" id="hdRange">&nbsp;</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tabs-in" role="tablist">
+    <button class="tab" role="tab" id="tab-rota" aria-controls="p-rota" aria-selected="true">Rota</button>
+    <button class="tab" role="tab" id="tab-slip" aria-controls="p-slip" aria-selected="false">Breakdown</button>
+    <button class="tab" role="tab" id="tab-set" aria-controls="p-set" aria-selected="false">Setup</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ============ ROTA ============ -->
+<section class="panel" id="p-rota" role="tabpanel" aria-labelledby="tab-rota">
+  <div class="card">
+    <div class="card-hd">
+      <h2>Shifts</h2>
+      <button class="btn sm ghost" id="clearMonth">Clear all</button>
+    </div>
+    <div class="dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+    <div class="grid" id="grid"></div>
+    <div class="legend" id="legend"></div>
+    <div class="calfoot" id="calfoot"></div>
+  </div>
+
+  <div class="card" id="photoCard">
+    <div class="card-hd"><h2>Rota photo</h2><span class="hint" id="photoHint">Keep it on screen while you tap</span></div>
+    <div class="card-bd" id="photoBody"></div>
+  </div>
+
+  <div class="card">
+    <details class="acc" id="importAcc">
+      <summary>Type or paste a rota</summary>
+      <div class="card-bd">
+        <p class="hint" style="margin:0 0 9px">One shift per line &mdash; a day, a code, and optionally hours or a time range. All of these work:</p>
+        <p class="hint num" style="margin:0 0 10px;font-size:11.5px;line-height:1.7">
+          3 N<br>Mon 4 D 07:00-19:00<br>05/09 OT 12<br>2026-09-06 AL
+        </p>
+        <textarea id="importText" placeholder="3 N&#10;4 D&#10;5 OFF&#10;6 N 11.5"></textarea>
+        <div class="btnrow" style="margin-top:10px">
+          <button class="btn primary" id="parseBtn">Read it</button>
+          <button class="btn sm ghost" id="copyPrompt">Copy prompt for Claude</button>
+        </div>
+        <div id="parseOut"></div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ============ BREAKDOWN ============ -->
+<section class="panel" id="p-slip" role="tabpanel" aria-labelledby="tab-slip" hidden>
+  <div class="card">
+    <div class="band"><h2>Payments</h2><span class="v">Value</span></div>
+    <div class="rows" id="payRows"></div>
+  </div>
+  <div class="card">
+    <div class="band"><h2>Deductions</h2><span class="v">Value</span></div>
+    <div class="rows" id="dedRows"></div>
+  </div>
+  <div class="card">
+    <div class="netband"><span class="nm">Net payment</span><span class="amt num" id="netSlip">&pound;0.00</span></div>
+    <div class="split" id="progress"></div>
+    <details class="acc">
+      <summary>How this is worked out</summary>
+      <div class="card-bd">
+        <div class="hint" id="workings"></div>
+      </div>
+    </details>
+  </div>
+  <p class="hint" style="padding:0 4px">An estimate only. PAYE is worked out cumulatively across the tax year, so HMRC&rsquo;s figure can differ by a pound or two &mdash; and anything your employer adds mid-month (bank holiday cover, sleep-ins, a rate change) won&rsquo;t be here unless you enter it.</p>
+</section>
+
+<!-- ============ SETUP ============ -->
+<section class="panel" id="p-set" role="tabpanel" aria-labelledby="tab-set" hidden>
+  <div class="card">
+    <div class="card-hd"><h2>Your pay</h2></div>
+    <div class="card-bd">
+      <div class="field">
+        <label for="s-base">Basic hourly rate<span class="fh">Paid on every worked hour</span></label>
+        <span class="pre"><span>&pound;</span><input type="number" step="0.01" id="s-base" inputmode="decimal"></span>
+      </div>
+      <div class="field">
+        <label for="s-hol">Holiday hourly rate<span class="fh">Used by holiday-type shifts</span></label>
+        <span class="pre"><span>&pound;</span><input type="number" step="0.01" id="s-hol" inputmode="decimal"></span>
+      </div>
+      <div class="field">
+        <label for="s-period">Pay period<span class="fh" id="periodHint"></span></label>
+        <select id="s-period" style="width:172px;flex:none">
+          <option value="1">Calendar month</option>
+          <option value="custom">Starts on a set day</option>
+        </select>
+      </div>
+      <div class="field" id="periodDayField" hidden>
+        <label for="s-pday">Period starts on day<span class="fh">e.g. 21 = 21st to the 20th</span></label>
+        <input type="number" min="1" max="28" id="s-pday" class="inp-xs" inputmode="numeric">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h2>Shift types</h2><button class="btn sm ghost" id="addType">+ Add</button></div>
+    <div class="card-bd">
+      <div class="tlist" id="typeList"></div>
+      <p class="hint" style="margin:11px 0 0"><b>Uplift</b> is the extra per hour on top of basic &mdash; your payslip shows these as their own line. <b>Own rate</b> replaces the basic rate entirely. <b>Unpaid</b> just marks the day.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h2>Pension</h2><button class="switch" id="s-pen-on" role="switch" aria-checked="true" aria-label="Pension contributions"></button></div>
+    <div class="card-bd" id="penBody">
+      <div class="field">
+        <label for="s-pen-rate">Your contribution<span class="fh">Percent of qualifying earnings</span></label>
+        <span class="pre"><input type="number" step="0.1" id="s-pen-rate" inputmode="decimal" style="padding-left:9px"></span>
+      </div>
+      <div class="field">
+        <label for="s-pen-lo">Lower threshold<span class="fh">Earnings below this don&rsquo;t count</span></label>
+        <span class="pre"><span>&pound;</span><input type="number" step="1" id="s-pen-lo" inputmode="decimal"></span>
+      </div>
+      <div class="field">
+        <label for="s-pen-hi">Upper threshold<span class="fh">Earnings above this don&rsquo;t count</span></label>
+        <span class="pre"><span>&pound;</span><input type="number" step="1" id="s-pen-hi" inputmode="decimal"></span>
+      </div>
+      <div class="field">
+        <label for="s-pen-ras">Relief at source<span class="fh">You pay 80%, HMRC adds the rest. NEST&rsquo;s default.</span></label>
+        <button class="switch" id="s-pen-ras" role="switch" aria-checked="true" aria-label="Relief at source"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h2>Other deductions</h2><button class="btn sm ghost" id="addDed">+ Add</button></div>
+    <div class="card-bd"><div class="tlist" id="dedList"></div></div>
+  </div>
+
+  <div class="card">
+    <details class="acc">
+      <summary>Tax &amp; National Insurance</summary>
+      <div class="card-bd">
+        <div class="field">
+          <label for="s-taxcode">Tax code<span class="fh">1257L, BR, D0, 0T or NT</span></label>
+          <input type="text" id="s-taxcode" class="inp-s" autocapitalize="characters">
+        </div>
+        <div class="field">
+          <label for="s-nipt">NI primary threshold<span class="fh">Per month, before NI starts</span></label>
+          <span class="pre"><span>&pound;</span><input type="number" step="1" id="s-nipt" inputmode="decimal"></span>
+        </div>
+        <div class="field">
+          <label for="s-niuel">NI upper limit<span class="fh">Above this, 2% instead</span></label>
+          <span class="pre"><span>&pound;</span><input type="number" step="1" id="s-niuel" inputmode="decimal"></span>
+        </div>
+        <div class="field">
+          <label for="s-nirate">Main NI rate<span class="fh">Percent, category A</span></label>
+          <span class="pre"><input type="number" step="0.1" id="s-nirate" inputmode="decimal" style="padding-left:9px"></span>
+        </div>
+        <div class="field">
+          <label for="s-scot">Scottish rates<span class="fh">Tax code starting S</span></label>
+          <button class="switch" id="s-scot" role="switch" aria-checked="false" aria-label="Scottish tax rates"></button>
+        </div>
+        <p class="hint" style="margin:11px 0 0">Defaults match the thresholds on your payslip. If a new tax year moves them, change them here.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <details class="acc">
+      <summary>Backup &amp; reset</summary>
+      <div class="card-bd">
+        <p class="hint" style="margin:0 0 9px">Everything lives in this browser only. Copy the backup code to move your setup to another phone or computer.</p>
+        <div class="btnrow">
+          <button class="btn" id="copyBackup">Copy backup code</button>
+          <button class="btn" id="pasteBackup">Restore from code</button>
+          <button class="btn danger ghost" id="resetAll">Reset everything</button>
+        </div>
+      </div>
+    </details>
+  </div>
+  <p class="hint" style="padding:0 4px 10px">Set your own rates above before you trust the figures. Tax, NI and pension thresholds start at HMRC&rsquo;s monthly values for category A and a 1257L code &mdash; change them here when a new tax year moves them.</p>
+</section>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="grab"></div>
+  <div class="sheet-in">
+    <h3 id="sheetTitle">Day</h3>
+    <p class="sub" id="sheetSub"></p>
+    <div class="picks" id="picks"></div>
+    <div class="field" style="margin-top:12px;border-bottom:none">
+      <label for="sheetHours">Hours paid</label>
+      <div class="stepper">
+        <button id="hMinus" aria-label="Fewer hours">&minus;</button>
+        <input type="number" step="0.25" id="sheetHours" class="num" inputmode="decimal">
+        <button id="hPlus" aria-label="More hours">+</button>
+      </div>
+    </div>
+    <div class="btnrow" style="margin-top:6px">
+      <button class="btn primary" id="sheetSave" style="flex:1">Save shift</button>
+      <button class="btn danger" id="sheetClear">Clear day</button>
+    </div>
+  </div>
+</div>
+<div class="zoom" id="zoom"><img id="zoomImg" alt="Your rota"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+var GBP="£", NDASH="–";
+var KEY="rotaPayslip.v1", PHOTOKEY="rotaPayslip.photo";
+
+/* ---------------- defaults, taken from the payslip ---------------- */
+function defaults(){
+  return {
+    settings:{
+      baseRate:12.00, holidayRate:12.00,
+      periodStart:1,
+      taxCode:"1257L", scottish:false,
+      niPT:1048, niUEL:4189, niRate:8, niUpperRate:2,
+      pensionOn:true, pensionRate:5, pensionLo:520, pensionHi:4189, pensionRAS:true,
+      others:[]
+    },
+    types:[
+      {id:"day",   code:"D",   name:"Day shift",     hours:12, mode:"base",   extra:0, rate:0,     h:222},
+      {id:"night", code:"N",   name:"Night shift",   hours:12, mode:"base",   extra:0, rate:0,     h:268},
+      {id:"ot",    code:"OT",  name:"Overtime",      hours:12, mode:"base",   extra:1, rate:0,     h:30},
+      {id:"bh",    code:"BH",  name:"Bank holiday",  hours:12, mode:"base",   extra:1, rate:0,     h:172},
+      {id:"al",    code:"AL",  name:"Holiday",       hours:12, mode:"rate",   extra:0, rate:12.00, h:140},
+      {id:"off",   code:"OFF", name:"Rest day",      hours:0,  mode:"unpaid", extra:0, rate:0,     h:220}
+    ],
+    shifts:{}
+  };
+}
+var DB = defaults(), S = DB.settings;
+
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(!raw) return;
+    var d = JSON.parse(raw);
+    if(d && d.settings && d.types && d.shifts){
+      var base = defaults();
+      DB = {settings:Object.assign(base.settings, d.settings), types:d.types, shifts:d.shifts};
+      S = DB.settings;
+    }
+  }catch(e){}
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }
+  catch(e){ toast("Couldn't save — this browser is blocking storage"); }
+}
+
+/* ---------------- helpers ---------------- */
+var $ = function(id){ return document.getElementById(id); };
+function r2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }
+function money(n){
+  var neg = n < 0; n = Math.abs(r2(n));
+  return (neg?"-":"") + GBP + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+function hrs(n){ return (Math.round(n*100)/100).toString().replace(/\.00$/,""); }
+function iso(d){
+  var m = d.getMonth()+1, day = d.getDate();
+  return d.getFullYear() + "-" + (m<10?"0":"") + m + "-" + (day<10?"0":"") + day;
+}
+function typeById(id){
+  for(var i=0;i<DB.types.length;i++) if(DB.types[i].id===id) return DB.types[i];
+  return null;
+}
+var MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+var toastTimer;
+function toast(msg){
+  var t = $("toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove("on"); }, 2600);
+}
+
+/* ---------------- pay period ---------------- */
+var view = new Date(); view.setDate(1); view.setHours(0,0,0,0);
+
+function period(){
+  var y = view.getFullYear(), m = view.getMonth(), sd = parseInt(S.periodStart,10) || 1;
+  if(sd <= 1) return {start:new Date(y,m,1), end:new Date(y,m+1,0)};
+  return {start:new Date(y,m-1,sd), end:new Date(y,m,sd-1)};
+}
+function eachDay(p){
+  var out=[], d=new Date(p.start);
+  while(d <= p.end){ out.push(new Date(d)); d.setDate(d.getDate()+1); }
+  return out;
+}
+function rangeLabel(p){
+  var a = p.start.getDate() + " " + MON[p.start.getMonth()];
+  var b = p.end.getDate() + " " + MON[p.end.getMonth()];
+  return a + " " + NDASH + " " + b + " " + p.end.getFullYear();
+}
+
+/* ---------------- the sums ---------------- */
+function shiftPay(t, h){
+  if(t.mode === "unpaid" || h <= 0) return 0;
+  if(t.mode === "rate") return h * (+t.rate || 0);
+  return h * ((+S.baseRate || 0) + (+t.extra || 0));
+}
+
+function taxOn(gross){
+  var code = String(S.taxCode || "1257L").toUpperCase().replace(/[\s\/]/g,"");
+  var scottish = !!S.scottish;
+  if(code.charAt(0) === "S"){ scottish = true; code = code.slice(1); }
+  if(code.charAt(0) === "C") code = code.slice(1);
+  code = code.replace(/(W1|M1|X)$/,"");
+  if(code === "NT") return {tax:0, note:"No tax (code NT)"};
+  if(code === "BR") return {tax:r2(gross*0.20), note:"All pay at 20% (code BR)"};
+  if(code === "D0") return {tax:r2(gross*0.40), note:"All pay at 40% (code D0)"};
+  if(code === "D1") return {tax:r2(gross*0.45), note:"All pay at 45% (code D1)"};
+
+  var free = 0, added = 0, km = code.match(/^K(\d+)/);
+  if(km){ added = (parseInt(km[1],10)*10) / 12; }
+  else { var nm = code.match(/^(\d+)/); free = nm ? (parseInt(nm[1],10)*10)/12 : 0; }
+  free = Math.round(free*100)/100;
+
+  var taxable = Math.max(0, gross - free + added);
+  var bands = scottish
+    ? [[2827,0.19],[12094,0.20],[16171,0.21],[31338,0.42],[50140,0.45],[Infinity,0.48]]
+    : [[37700,0.20],[74870,0.40],[Infinity,0.45]];
+  var left = taxable, tax = 0, used = [];
+  for(var i=0;i<bands.length;i++){
+    if(left <= 0) break;
+    var w = bands[i][0] === Infinity ? Infinity : bands[i][0]/12;
+    var slice = Math.min(left, w);
+    tax += slice * bands[i][1];
+    if(slice > 0.005) used.push(money(slice) + " at " + Math.round(bands[i][1]*100) + "%");
+    left -= slice;
+  }
+  return {tax:r2(tax), free:free, taxable:taxable, note:
+    "Tax-free " + money(free) + " this month, then " + (used.join(", ") || "nothing to tax") +
+    (scottish ? " (Scottish bands)" : "")};
+}
+
+function niOn(gross){
+  var pt = +S.niPT || 0, uel = +S.niUEL || Infinity;
+  var main = (+S.niRate || 0)/100, up = (+S.niUpperRate || 0)/100;
+  if(gross <= pt) return {ni:0, note:"Under the " + money(pt) + " threshold"};
+  var ni = (Math.min(gross, uel) - pt) * main, note = money(Math.min(gross,uel)-pt) + " at " + (main*100) + "%";
+  if(gross > uel){ ni += (gross - uel) * up; note += ", " + money(gross-uel) + " at " + (up*100) + "%"; }
+  return {ni:r2(ni), note:note};
+}
+
+function pensionOn(gross){
+  if(!S.pensionOn) return {pen:0, note:""};
+  var lo = +S.pensionLo || 0, hi = +S.pensionHi || Infinity;
+  var q = Math.max(0, Math.min(gross, hi) - lo);
+  var full = q * ((+S.pensionRate || 0)/100);
+  var pen = S.pensionRAS ? full * 0.8 : full;
+  return {pen:r2(pen), note:
+    money(q) + " qualifying at " + (+S.pensionRate) + "%" +
+    (S.pensionRAS ? ", you pay 80% of " + money(full) : "")};
+}
+
+function calc(){
+  var p = period(), days = eachDay(p);
+  var today = new Date(); today.setHours(0,0,0,0);
+  var baseHours = 0, shifts = 0, totalHours = 0, soFarGross = 0, soFarShifts = 0;
+  var uplift = {}, rated = {};
+
+  for(var i=0;i<days.length;i++){
+    var rec = DB.shifts[iso(days[i])];
+    if(!rec) continue;
+    var t = typeById(rec.t); if(!t) continue;
+    var h = (rec.h === null || rec.h === undefined) ? +t.hours : +rec.h;
+    if(t.mode === "unpaid" || !(h > 0)) continue;
+    shifts++; totalHours += h;
+    if(t.mode === "rate"){
+      rated[t.id] = (rated[t.id] || 0) + h;
+    } else {
+      baseHours += h;
+      if(+t.extra > 0) uplift[t.id] = (uplift[t.id] || 0) + h;
+    }
+    if(days[i] < today){ soFarGross += shiftPay(t, h); soFarShifts++; }
+  }
+
+  var lines = [];
+  if(baseHours > 0) lines.push({name:"Basic pay", hours:baseHours, rate:+S.baseRate, amount:r2(baseHours * (+S.baseRate||0))});
+  for(var id in rated){ if(!rated.hasOwnProperty(id)) continue;
+    var rt = typeById(id);
+    lines.push({name:rt.name + " pay", hours:rated[id], rate:+rt.rate, amount:r2(rated[id] * (+rt.rate||0))});
+  }
+  for(var uid in uplift){ if(!uplift.hasOwnProperty(uid)) continue;
+    var ut = typeById(uid);
+    lines.push({name:ut.name + " uplift", hours:uplift[uid], rate:+ut.extra, amount:r2(uplift[uid] * (+ut.extra||0))});
+  }
+  var gross = 0;
+  for(var k=0;k<lines.length;k++) gross += lines[k].amount;
+  gross = r2(gross);
+
+  var T = taxOn(gross), N = niOn(gross), P = pensionOn(gross);
+  var deds = [];
+  if(T.tax > 0) deds.push({name:"Tax", amount:T.tax});
+  if(N.ni > 0) deds.push({name:"National Insurance", amount:N.ni});
+  if(P.pen > 0) deds.push({name:"Pension", amount:P.pen});
+  var list = S.others || [];
+  for(var o=0;o<list.length;o++){
+    var amt = list[o].pct ? gross * ((+list[o].amount||0)/100) : (+list[o].amount||0);
+    if(amt > 0) deds.push({name:list[o].name || "Deduction", amount:r2(amt)});
+  }
+  var totalDed = 0;
+  for(var q2=0;q2<deds.length;q2++) totalDed += deds[q2].amount;
+  totalDed = r2(totalDed);
+
+  return {period:p, lines:lines, gross:gross, deds:deds, totalDed:totalDed, net:r2(gross-totalDed),
+          shifts:shifts, hours:totalHours, soFarGross:r2(soFarGross), soFarShifts:soFarShifts,
+          notes:{tax:T, ni:N, pen:P}};
+}
+
+/* ---------------- render ---------------- */
+function render(){
+  var c = calc();
+  var p = c.period;
+
+  $("periodLbl").textContent = MONTHS[view.getMonth()] + " " + view.getFullYear();
+  $("hdRange").textContent = rangeLabel(p) + (S.periodStart > 1 ? " · paid for " + MONTHS[view.getMonth()] : "");
+  var parts = c.net.toFixed(2).split(".");
+  $("netBig").innerHTML = GBP + parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "<small>." + parts[1] + "</small>";
+  $("hdShifts").textContent = c.shifts;
+  $("hdHours").textContent = hrs(c.hours);
+
+  renderGrid(p);
+  renderLegend();
+  $("calfoot").innerHTML =
+    "<span>Shifts <b>" + c.shifts + "</b></span>" +
+    "<span>Hours <b>" + hrs(c.hours) + "</b></span>" +
+    "<span>Gross <b>" + money(c.gross) + "</b></span>" +
+    "<span>Deductions <b>" + money(c.totalDed) + "</b></span>";
+
+  renderSlip(c);
+}
+
+function renderGrid(p){
+  var g = $("grid"), html = "", today = iso(new Date());
+  var lead = (p.start.getDay() + 6) % 7;
+  for(var b=0;b<lead;b++) html += '<div class="cell blank"></div>';
+  var days = eachDay(p), now = new Date(); now.setHours(0,0,0,0);
+  for(var i=0;i<days.length;i++){
+    var d = days[i], key = iso(d), rec = DB.shifts[key], t = rec ? typeById(rec.t) : null;
+    var cls = "cell", hue = 220, inner = "";
+    if(key === today) cls += " today";
+    else if(d < now) cls += " past";
+    if(t){
+      cls += " filled"; hue = t.h;
+      if(t.mode === "unpaid") cls += " unpaid";
+      var h = (rec.h === null || rec.h === undefined) ? +t.hours : +rec.h;
+      inner = '<span class="code">' + esc(t.code) + '</span>' +
+              (t.mode === "unpaid" || !(h>0) ? "" : '<span class="hrs">' + hrs(h) + '</span>');
+    }
+    html += '<button class="' + cls + '" style="--h:' + hue + '" data-key="' + key + '" aria-label="' +
+            DAYS[d.getDay()] + " " + d.getDate() + " " + MON[d.getMonth()] + '">' +
+            '<span class="d">' + d.getDate() + '</span>' + inner + '</button>';
+  }
+  g.innerHTML = html;
+}
+
+function renderLegend(){
+  var html = "";
+  for(var i=0;i<DB.types.length;i++){
+    var t = DB.types[i];
+    html += '<span class="lgd' + (t.mode==="unpaid"?" unpaid":"") + '" style="--h:' + t.h + '"><i>' + esc(t.code) + '</i>' + esc(t.name) + '</span>';
+  }
+  $("legend").innerHTML = html;
+}
+
+function renderSlip(c){
+  var html = "";
+  if(!c.lines.length){
+    html = '<div class="empty">No shifts entered for this period yet.<br>Tap days on the Rota tab to fill it in.</div>';
+  } else {
+    for(var i=0;i<c.lines.length;i++){
+      var L = c.lines[i];
+      html += '<div class="row"><span class="nm">' + esc(L.name) +
+              '<span class="sub">' + hrs(L.hours) + " hrs @ " + money(L.rate) + '</span></span>' +
+              '<span class="amt">' + money(L.amount) + '</span></div>';
+    }
+  }
+  html += '<div class="row total"><span class="nm">Total payments</span><span class="amt">' + money(c.gross) + '</span></div>';
+  $("payRows").innerHTML = html;
+
+  var d = "";
+  for(var j=0;j<c.deds.length;j++){
+    d += '<div class="row neg"><span class="nm">' + esc(c.deds[j].name) + '</span><span class="amt">' + money(c.deds[j].amount) + '</span></div>';
+  }
+  if(!c.deds.length) d = '<div class="empty">Nothing to deduct.</div>';
+  d += '<div class="row total neg"><span class="nm">Total deductions</span><span class="amt">' + money(c.totalDed) + '</span></div>';
+  $("dedRows").innerHTML = d;
+
+  $("netSlip").textContent = money(c.net);
+
+  var left = c.shifts - c.soFarShifts;
+  $("progress").innerHTML =
+    '<div><div class="k">Gross earned so far</div><div class="v pos">' + money(c.soFarGross) + '</div></div>' +
+    '<div><div class="k">Still to work</div><div class="v">' + left + ' shift' + (left===1?"":"s") + '</div></div>';
+
+  var n = c.notes;
+  $("workings").innerHTML =
+    '<p style="margin:0 0 8px"><b>Tax</b> — ' + esc(n.tax.note) + '.</p>' +
+    '<p style="margin:0 0 8px"><b>National Insurance</b> — ' + esc(n.ni.note) + '.</p>' +
+    (S.pensionOn ? '<p style="margin:0 0 8px"><b>Pension</b> — ' + esc(n.pen.note) + '.</p>' : "") +
+    '<p style="margin:0"><b>Take-home</b> — ' + money(c.gross) + " less " + money(c.totalDed) + " = " + money(c.net) + '.</p>';
+}
+
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* ---------------- tabs ---------------- */
+var tabs = [["tab-rota","p-rota"],["tab-slip","p-slip"],["tab-set","p-set"]];
+tabs.forEach(function(pair){
+  $(pair[0]).addEventListener("click", function(){
+    tabs.forEach(function(p2){
+      var on = p2[0] === pair[0];
+      $(p2[0]).setAttribute("aria-selected", on ? "true" : "false");
+      $(p2[1]).hidden = !on;
+    });
+    if(pair[0] === "tab-set") renderSetup();
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+});
+
+/* ---------------- month nav ---------------- */
+$("prevM").addEventListener("click", function(){ view.setMonth(view.getMonth()-1); render(); });
+$("nextM").addEventListener("click", function(){ view.setMonth(view.getMonth()+1); render(); });
+
+$("clearMonth").addEventListener("click", function(){
+  var days = eachDay(period()), n = 0;
+  for(var i=0;i<days.length;i++){ if(DB.shifts[iso(days[i])]){ delete DB.shifts[iso(days[i])]; n++; } }
+  save(); render();
+  toast(n ? "Cleared " + n + " day" + (n===1?"":"s") : "Nothing to clear");
+});
+
+/* ---------------- day sheet ---------------- */
+var sheetKey = null, sheetType = null;
+
+$("grid").addEventListener("click", function(e){
+  var btn = e.target.closest ? e.target.closest(".cell") : null;
+  if(!btn || !btn.dataset.key) return;
+  openSheet(btn.dataset.key);
+});
+
+function openSheet(key){
+  sheetKey = key;
+  var parts = key.split("-"), d = new Date(+parts[0], +parts[1]-1, +parts[2]);
+  var rec = DB.shifts[key];
+  sheetType = rec ? rec.t : null;
+  $("sheetTitle").textContent = DAYS[d.getDay()] + " " + d.getDate() + " " + MONTHS[d.getMonth()];
+  $("sheetSub").textContent = rec ? "Tap a type to change it" : "What are you working?";
+  var startType = sheetType || DB.types[0].id;
+  if(!sheetType) sheetType = startType;
+  var t = typeById(sheetType);
+  $("sheetHours").value = rec && rec.h != null ? rec.h : (t ? t.hours : 12);
+  renderPicks();
+  $("scrim").classList.add("on");
+  $("sheet").classList.add("on");
+}
+function closeSheet(){
+  $("scrim").classList.remove("on");
+  $("sheet").classList.remove("on");
+  sheetKey = null;
+}
+function renderPicks(){
+  var html = "";
+  for(var i=0;i<DB.types.length;i++){
+    var t = DB.types[i], on = t.id === sheetType;
+    var pay = t.mode === "unpaid" ? "unpaid"
+            : t.mode === "rate" ? money(t.rate) + "/hr"
+            : (+t.extra > 0 ? money((+S.baseRate) + (+t.extra)) + "/hr" : money(+S.baseRate) + "/hr");
+    html += '<button class="pick' + (t.mode==="unpaid"?" unpaid":"") + '" style="--h:' + t.h + '" data-id="' + t.id + '" aria-pressed="' + (on?"true":"false") + '">' +
+            '<i>' + esc(t.code) + '</i><span><span class="pn">' + esc(t.name) + '</span>' +
+            '<span class="pp">' + pay + '</span></span></button>';
+  }
+  $("picks").innerHTML = html;
+}
+$("picks").addEventListener("click", function(e){
+  var b = e.target.closest ? e.target.closest(".pick") : null;
+  if(!b) return;
+  sheetType = b.dataset.id;
+  var t = typeById(sheetType);
+  if(t) $("sheetHours").value = t.hours;
+  renderPicks();
+});
+$("hMinus").addEventListener("click", function(){
+  var v = parseFloat($("sheetHours").value) || 0;
+  $("sheetHours").value = Math.max(0, r2(v - 0.5));
+});
+$("hPlus").addEventListener("click", function(){
+  var v = parseFloat($("sheetHours").value) || 0;
+  $("sheetHours").value = r2(v + 0.5);
+});
+$("sheetSave").addEventListener("click", function(){
+  if(!sheetKey) return;
+  var h = parseFloat($("sheetHours").value);
+  if(isNaN(h) || h < 0) h = 0;
+  DB.shifts[sheetKey] = {t:sheetType, h:h};
+  save(); closeSheet(); render();
+});
+$("sheetClear").addEventListener("click", function(){
+  if(sheetKey) delete DB.shifts[sheetKey];
+  save(); closeSheet(); render();
+});
+$("scrim").addEventListener("click", closeSheet);
+document.addEventListener("keydown", function(e){
+  if(e.key === "Escape"){ closeSheet(); $("zoom").classList.remove("on"); }
+});
+
+/* ---------------- rota photo ---------------- */
+var photo = null;
+try{ photo = localStorage.getItem(PHOTOKEY); }catch(e){}
+
+function renderPhoto(){
+  var b = $("photoBody");
+  if(photo){
+    b.innerHTML = '<div class="imgwrap"><img class="rota-img" id="rotaImg" src="' + photo + '" alt="Your rota">' +
+                  '<button class="x" id="dropPhoto" aria-label="Remove photo">&times;</button></div>' +
+                  '<p class="hint" style="margin:9px 0 0">Tap the photo to enlarge it, then tap days above to enter the shifts.</p>';
+    $("photoHint").textContent = "Tap to enlarge";
+    $("rotaImg").addEventListener("click", function(){
+      $("zoomImg").src = photo; $("zoom").classList.add("on");
+    });
+    $("dropPhoto").addEventListener("click", function(){
+      photo = null;
+      try{ localStorage.removeItem(PHOTOKEY); }catch(e){}
+      renderPhoto();
+    });
+  } else {
+    b.innerHTML = '<label class="btn" for="photoInput" style="width:100%">Add a photo of your rota</label>' +
+                  '<input type="file" accept="image/*" id="photoInput" style="display:none">' +
+                  '<p class="hint" style="margin:9px 0 0">Photograph the rota on the wall, then keep it here while you tap the days in.</p>';
+    $("photoHint").textContent = "";
+    $("photoInput").addEventListener("change", onPhoto);
+  }
+}
+function onPhoto(e){
+  var f = e.target.files && e.target.files[0];
+  if(!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    var img = new Image();
+    img.onload = function(){
+      var max = 1500, w = img.width, h = img.height;
+      if(w > max || h > max){ var s = max / Math.max(w,h); w = Math.round(w*s); h = Math.round(h*s); }
+      var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      photo = cv.toDataURL("image/jpeg", 0.72);
+      try{ localStorage.setItem(PHOTOKEY, photo); }
+      catch(err){ toast("Photo too big to keep — it'll go when you close this"); }
+      renderPhoto();
+    };
+    img.onerror = function(){ toast("Couldn't read that image"); };
+    img.src = fr.result;
+  };
+  fr.onerror = function(){ toast("Couldn't read that file"); };
+  fr.readAsDataURL(f);
+}
+$("zoom").addEventListener("click", function(){ this.classList.remove("on"); });
+
+/* ---------------- reading a written rota ---------------- */
+var ALIAS = {LD:"day", E:"day", EARLY:"day", L:"day", LATE:"day", DAY:"day", DAYS:"day",
+             ND:"night", NIGHT:"night", NIGHTS:"night", NS:"night",
+             OT:"ot", OVERTIME:"ot", EXTRA:"ot", XTRA:"ot", BANK:"ot",
+             BH:"bh", HOLIDAY:"al", HOL:"al", AL:"al", ANNUAL:"al", LEAVE:"al",
+             OFF:"off", REST:"off", RD:"off", X:"off", O:"off", SICK:"off", S:"off"};
+
+function codeIndex(){
+  var ix = {};
+  DB.types.forEach(function(t){ ix[String(t.code).toUpperCase()] = t.id; });
+  DB.types.forEach(function(t){
+    var w = String(t.name).toUpperCase().split(/\s+/)[0];
+    if(!ix[w]) ix[w] = t.id;
+  });
+  for(var k in ALIAS){ if(ALIAS.hasOwnProperty(k) && !ix[k] && typeById(ALIAS[k])) ix[k] = ALIAS[k]; }
+  return ix;
+}
+
+function hoursFromRange(txt){
+  var m = txt.match(/\b([01]?\d|2[0-4])(?:[:.]([0-5]\d))?\s*(AM|PM)?\s*(?:-|--|–|—|TO)\s*([01]?\d|2[0-4])(?:[:.]([0-5]\d))?\s*(AM|PM)?/);
+  if(!m) return null;
+  function mins(h, mm, ap){
+    h = parseInt(h,10); mm = mm ? parseInt(mm,10) : 0;
+    if(ap === "PM" && h < 12) h += 12;
+    if(ap === "AM" && h === 12) h = 0;
+    return h*60 + mm;
+  }
+  var a = mins(m[1], m[2], m[3]), b = mins(m[4], m[5], m[6]);
+  var diff = b - a; if(diff <= 0) diff += 24*60;
+  return {hours: Math.round(diff/60 * 4)/4, matched: m[0]};
+}
+
+function parseRota(text){
+  var ix = codeIndex(), p = period(), days = eachDay(p);
+  var lines = text.split(/[\n;]+/), out = [], missed = [];
+
+  for(var i=0;i<lines.length;i++){
+    var raw = lines[i].trim();
+    if(!raw) continue;
+    var work = raw.toUpperCase();
+
+    /* dates first: 2026-09-06 must not be read as a 26-09 clock range */
+    var date = null, dm;
+    if((dm = work.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/))){
+      date = new Date(+dm[1], +dm[2]-1, +dm[3]); work = work.replace(dm[0], " ");
+    } else {
+      /* day/month, e.g. 05/09 or 05.09 - a dotted form needs two digits and a real
+         month, so shift lengths like "11.5" aren't mistaken for a date */
+      dm = work.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+      if(!dm){
+        var dot = work.match(/\b(\d{1,2})\.(\d{2})(?:\.(\d{2,4}))?\b/);
+        if(dot && +dot[2] >= 1 && +dot[2] <= 12) dm = dot;
+      }
+      if(dm){
+        var yr = dm[3] ? (dm[3].length === 2 ? 2000 + (+dm[3]) : +dm[3]) : p.end.getFullYear();
+        date = new Date(yr, (+dm[2])-1, +dm[1]); work = work.replace(dm[0], " ");
+      }
+    }
+
+    var rangeHours = null, rg = hoursFromRange(work);
+    if(rg){ rangeHours = rg.hours; work = work.replace(rg.matched, " "); }
+
+    var tokens = work.split(/[^A-Z0-9.]+/).filter(Boolean);
+    var typeId = null, codeAt = -1;
+    for(var j=0;j<tokens.length;j++){
+      if(ix[tokens[j]]){ typeId = ix[tokens[j]]; codeAt = j; break; }
+    }
+    var dayNum = null, explicit = null;
+    for(var k=0;k<tokens.length;k++){
+      if(!/^\d+(\.\d+)?$/.test(tokens[k])) continue;
+      var v = parseFloat(tokens[k]);
+      if(codeAt >= 0 && k > codeAt){ if(explicit === null) explicit = v; }
+      else if(!date && dayNum === null && v >= 1 && v <= 31 && Number.isInteger(v)) dayNum = v;
+    }
+
+    if(!date && dayNum !== null){
+      for(var q=0;q<days.length;q++){ if(days[q].getDate() === dayNum){ date = days[q]; break; } }
+    }
+    if(!date || !typeId){ missed.push(raw); continue; }
+
+    var t = typeById(typeId);
+    var h = explicit !== null ? explicit : (rangeHours !== null ? rangeHours : +t.hours);
+    out.push({key:iso(date), date:date, typeId:typeId, hours:h, raw:raw});
+  }
+  return {rows:out, missed:missed};
+}
+
+var pending = null;
+$("parseBtn").addEventListener("click", function(){
+  var txt = $("importText").value;
+  if(!txt.trim()){ toast("Type or paste a rota first"); return; }
+  var res = parseRota(txt);
+  pending = res.rows;
+  var out = $("parseOut");
+  if(!res.rows.length){
+    out.innerHTML = '<div class="warnbox">Nothing recognised. Each line needs a day and a shift code, like <b>12 N</b>.</div>';
+    return;
+  }
+  var html = '<div class="prev">';
+  for(var i=0;i<res.rows.length;i++){
+    var r = res.rows[i], t = typeById(r.typeId);
+    html += '<div class="r"><span>' + r.date.getDate() + " " + MON[r.date.getMonth()] + " &middot; " + esc(t.name) + '</span><span>' +
+            (t.mode === "unpaid" ? "off" : hrs(r.hours) + " hrs") + '</span></div>';
+  }
+  html += '</div>';
+  if(res.missed.length){
+    html += '<div class="warnbox">Skipped ' + res.missed.length + ' line' + (res.missed.length===1?"":"s") +
+            ' I couldn\'t read: <b>' + esc(res.missed.slice(0,3).join(" / ")) + '</b></div>';
+  }
+  html += '<div class="btnrow" style="margin-top:10px"><button class="btn primary" id="applyBtn">Add ' +
+          res.rows.length + ' day' + (res.rows.length===1?"":"s") + '</button>' +
+          '<button class="btn ghost" id="cancelBtn">Cancel</button></div>';
+  out.innerHTML = html;
+  $("applyBtn").addEventListener("click", applyPending);
+  $("cancelBtn").addEventListener("click", function(){ out.innerHTML = ""; pending = null; });
+});
+
+function applyPending(){
+  if(!pending) return;
+  for(var i=0;i<pending.length;i++){
+    DB.shifts[pending[i].key] = {t:pending[i].typeId, h:pending[i].hours};
+  }
+  save(); render();
+  toast("Added " + pending.length + " day" + (pending.length===1?"":"s"));
+  $("parseOut").innerHTML = ""; $("importText").value = ""; pending = null;
+  $("importAcc").open = false;
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+$("copyPrompt").addEventListener("click", function(){
+  var codes = DB.types.map(function(t){ return t.code + "=" + t.name.toLowerCase(); }).join(", ");
+  var txt = "Here is a photo of my work rota for " + MONTHS[view.getMonth()] + " " + view.getFullYear() +
+    ". List every shift of mine you can see, one per line, in exactly this format: day-of-month, a space, the code, a space, the hours. " +
+    "Example: 03 N 12\nCodes: " + codes + "\nGive me only those lines, nothing else.";
+  copyText(txt, "Prompt copied — send it to Claude with your rota photo");
+});
+
+/* ---------------- clipboard ---------------- */
+function copyText(txt, okMsg){
+  function fallback(){
+    var ta = document.createElement("textarea");
+    ta.value = txt; ta.setAttribute("readonly","");
+    ta.style.cssText = "position:fixed;top:50%;left:50%;width:1px;height:1px;opacity:0";
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, txt.length);
+    var ok = false;
+    try{ ok = document.execCommand("copy"); }catch(e){}
+    document.body.removeChild(ta);
+    toast(ok ? okMsg : "Couldn't reach the clipboard here");
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ toast(okMsg); }, fallback);
+  } else fallback();
+}
+
+/* ---------------- setup ---------------- */
+var HUES = [222, 268, 30, 172, 140, 340, 200, 96];
+
+function num(id, val){ var el = $(id); if(el) el.value = val; }
+
+function renderSetup(){
+  num("s-base", S.baseRate); num("s-hol", S.holidayRate);
+  $("s-period").value = (+S.periodStart > 1) ? "custom" : "1";
+  $("periodDayField").hidden = !(+S.periodStart > 1);
+  num("s-pday", +S.periodStart > 1 ? S.periodStart : 21);
+  $("periodHint").textContent = rangeLabel(period());
+  num("s-taxcode", S.taxCode);
+  num("s-nipt", S.niPT); num("s-niuel", S.niUEL); num("s-nirate", S.niRate);
+  num("s-pen-rate", S.pensionRate); num("s-pen-lo", S.pensionLo); num("s-pen-hi", S.pensionHi);
+  setSwitch("s-pen-on", S.pensionOn); setSwitch("s-pen-ras", S.pensionRAS); setSwitch("s-scot", S.scottish);
+  $("penBody").style.display = S.pensionOn ? "" : "none";
+  renderTypes(); renderDeds();
+}
+function setSwitch(id, on){ $(id).setAttribute("aria-checked", on ? "true" : "false"); }
+
+function renderTypes(){
+  var html = "";
+  for(var i=0;i<DB.types.length;i++){
+    var t = DB.types[i];
+    var amtLabel = t.mode === "rate" ? "Rate " + GBP + "/hr" : t.mode === "base" ? "Uplift " + GBP + "/hr" : "&mdash;";
+    var amtVal = t.mode === "rate" ? t.rate : t.extra;
+    html += '<div class="trow" style="--h:' + t.h + '" data-i="' + i + '">' +
+      '<div class="trow-hd">' +
+        '<button class="tcode" data-act="hue" title="Change colour">' + esc(t.code) + '</button>' +
+        '<input class="nm" data-f="name" value="' + esc(t.name) + '" aria-label="Shift name">' +
+        '<button class="btn sm ghost danger" data-act="del" aria-label="Delete ' + esc(t.name) + '">&times;</button>' +
+      '</div>' +
+      '<div class="trow-gr">' +
+        '<div><label>Code</label><input data-f="code" value="' + esc(t.code) + '" maxlength="4"></div>' +
+        '<div><label>Hours</label><input type="number" step="0.25" data-f="hours" value="' + t.hours + '" inputmode="decimal"></div>' +
+        '<div><label>Paid as</label><select data-f="mode">' +
+          '<option value="base"' + (t.mode==="base"?" selected":"") + '>Basic + uplift</option>' +
+          '<option value="rate"' + (t.mode==="rate"?" selected":"") + '>Own rate</option>' +
+          '<option value="unpaid"' + (t.mode==="unpaid"?" selected":"") + '>Unpaid</option>' +
+        '</select></div>' +
+      '</div>' +
+      (t.mode === "unpaid" ? "" :
+      '<div class="trow-gr" style="grid-template-columns:1fr"><div><label>' + amtLabel + '</label>' +
+      '<input type="number" step="0.01" data-f="' + (t.mode==="rate"?"rate":"extra") + '" value="' + amtVal + '" inputmode="decimal"></div></div>') +
+    '</div>';
+  }
+  $("typeList").innerHTML = html;
+}
+
+$("typeList").addEventListener("input", function(e){
+  var row = e.target.closest(".trow"); if(!row) return;
+  var t = DB.types[+row.dataset.i], f = e.target.dataset.f;
+  if(!t || !f) return;
+  if(f === "name" || f === "code") t[f] = e.target.value;
+  else if(f === "mode"){ t.mode = e.target.value; save(); renderTypes(); render(); return; }
+  else t[f] = parseFloat(e.target.value) || 0;
+  save(); render();
+});
+$("typeList").addEventListener("click", function(e){
+  var row = e.target.closest(".trow"); if(!row) return;
+  var i = +row.dataset.i, act = e.target.dataset.act;
+  if(act === "hue"){
+    var cur = HUES.indexOf(DB.types[i].h);
+    DB.types[i].h = HUES[(cur + 1) % HUES.length];
+    save(); renderTypes(); render();
+  } else if(act === "del"){
+    if(DB.types.length <= 1){ toast("Keep at least one shift type"); return; }
+    var id = DB.types[i].id, used = 0;
+    for(var k in DB.shifts){ if(DB.shifts[k].t === id) used++; }
+    if(used && !confirm("Delete " + DB.types[i].name + "? It's used on " + used + " day" + (used===1?"":"s") + ", which will be cleared.")) return;
+    for(var k2 in DB.shifts){ if(DB.shifts[k2].t === id) delete DB.shifts[k2]; }
+    DB.types.splice(i,1);
+    save(); renderTypes(); render();
+  }
+});
+$("addType").addEventListener("click", function(){
+  DB.types.push({id:"t" + Date.now().toString(36), code:"NEW", name:"New shift", hours:12,
+                 mode:"base", extra:0, rate:0, h:HUES[DB.types.length % HUES.length]});
+  save(); renderTypes(); render();
+});
+
+function renderDeds(){
+  var list = S.others || [], html = "";
+  for(var i=0;i<list.length;i++){
+    var d = list[i];
+    html += '<div class="trow" data-i="' + i + '"><div class="trow-hd">' +
+      '<input class="nm" data-f="name" value="' + esc(d.name) + '" aria-label="Deduction name">' +
+      '<span class="pre" style="width:92px"><span>' + (d.pct ? "%" : GBP) + '</span>' +
+      '<input type="number" step="0.01" data-f="amount" value="' + d.amount + '" inputmode="decimal" style="padding-left:20px"></span>' +
+      '<button class="btn sm ghost" data-act="pct" title="Switch between pounds and percent">' + (d.pct ? "%" : GBP) + '</button>' +
+      '<button class="btn sm ghost danger" data-act="del" aria-label="Delete">&times;</button>' +
+    '</div></div>';
+  }
+  if(!list.length) html = '<p class="hint" style="margin:0">Nothing else comes off your pay.</p>';
+  $("dedList").innerHTML = html;
+}
+$("dedList").addEventListener("input", function(e){
+  var row = e.target.closest(".trow"); if(!row) return;
+  var d = S.others[+row.dataset.i], f = e.target.dataset.f;
+  if(!d || !f) return;
+  d[f] = f === "amount" ? (parseFloat(e.target.value) || 0) : e.target.value;
+  save(); render();
+});
+$("dedList").addEventListener("click", function(e){
+  var row = e.target.closest(".trow"); if(!row) return;
+  var i = +row.dataset.i, act = e.target.dataset.act;
+  if(act === "pct"){ S.others[i].pct = !S.others[i].pct; save(); renderDeds(); render(); }
+  else if(act === "del"){ S.others.splice(i,1); save(); renderDeds(); render(); }
+});
+$("addDed").addEventListener("click", function(){
+  if(!S.others) S.others = [];
+  S.others.push({name:"Deduction", amount:0, pct:false});
+  save(); renderDeds(); render();
+});
+
+/* settings inputs */
+[["s-base","baseRate"],["s-hol","holidayRate"],["s-nipt","niPT"],["s-niuel","niUEL"],
+ ["s-nirate","niRate"],["s-pen-rate","pensionRate"],["s-pen-lo","pensionLo"],["s-pen-hi","pensionHi"]
+].forEach(function(pair){
+  $(pair[0]).addEventListener("input", function(){
+    S[pair[1]] = parseFloat(this.value) || 0;
+    save(); render();
+  });
+});
+$("s-taxcode").addEventListener("input", function(){ S.taxCode = this.value.toUpperCase(); save(); render(); });
+$("s-period").addEventListener("change", function(){
+  if(this.value === "custom"){
+    S.periodStart = parseInt($("s-pday").value,10) || 21;
+    $("periodDayField").hidden = false;
+  } else { S.periodStart = 1; $("periodDayField").hidden = true; }
+  save(); render(); $("periodHint").textContent = rangeLabel(period());
+});
+$("s-pday").addEventListener("input", function(){
+  var v = parseInt(this.value,10);
+  if(!v || v < 1) v = 1; if(v > 28) v = 28;
+  S.periodStart = v; save(); render();
+  $("periodHint").textContent = rangeLabel(period());
+});
+function toggle(id, key, after){
+  $(id).addEventListener("click", function(){
+    S[key] = !S[key];
+    setSwitch(id, S[key]);
+    save(); render(); if(after) after();
+  });
+}
+toggle("s-pen-on","pensionOn", function(){ $("penBody").style.display = S.pensionOn ? "" : "none"; });
+toggle("s-pen-ras","pensionRAS");
+toggle("s-scot","scottish");
+
+/* ---------------- backup ---------------- */
+function encode(){ return btoa(unescape(encodeURIComponent(JSON.stringify(DB)))); }
+$("copyBackup").addEventListener("click", function(){
+  copyText(encode(), "Backup code copied");
+});
+$("pasteBackup").addEventListener("click", function(){
+  var host = this.parentNode.parentNode;
+  if(host.querySelector(".restorebox")) return;
+  var box = document.createElement("div");
+  box.className = "restorebox";
+  box.style.marginTop = "10px";
+  box.innerHTML = '<textarea placeholder="Paste your backup code here" style="min-height:80px"></textarea>' +
+                  '<div class="btnrow" style="margin-top:8px"><button class="btn primary" data-go="1">Restore</button></div>';
+  host.appendChild(box);
+  box.querySelector("[data-go]").addEventListener("click", function(){
+    var v = box.querySelector("textarea").value.trim();
+    try{
+      var d = JSON.parse(decodeURIComponent(escape(atob(v))));
+      if(!d.settings || !d.types || !d.shifts) throw new Error("shape");
+      DB = {settings:Object.assign(defaults().settings, d.settings), types:d.types, shifts:d.shifts};
+      S = DB.settings;
+      save(); renderSetup(); render(); box.remove();
+      toast("Restored");
+    }catch(err){ toast("That code didn't look right"); }
+  });
+});
+$("resetAll").addEventListener("click", function(){
+  if(!confirm("Delete all shifts and settings, and start again from the payslip defaults?")) return;
+  DB = defaults(); S = DB.settings;
+  save(); renderSetup(); render(); toast("Reset");
+});
+
+/* ---------------- go ---------------- */
+function syncHeader(){
+  var h = document.querySelector("header");
+  if(h) document.documentElement.style.setProperty("--hdh", h.offsetHeight + "px");
+}
+window.addEventListener("resize", syncHeader);
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncHeader);
+
+load();
+renderPhoto();
+render();
+syncHeader();
+})();
+</script>
