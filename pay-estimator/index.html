@@ -375,7 +375,15 @@ details.acc .card-bd{padding-top:0}
           <input type="number" min="1" max="31" id="s-payday" class="inp-xs" inputmode="numeric">
         </div>
         <div class="field">
-          <label for="s-slipdow">Payslip comes out<span class="fh">The last one before payday</span></label>
+          <label for="s-slipweeks">Payslip week<span class="fh">Counting back from the week payday falls in</span></label>
+          <select id="s-slipweeks" style="width:150px;flex:none">
+            <option value="0">Payday&rsquo;s own week</option>
+            <option value="1">The week before</option>
+            <option value="2">Two weeks before</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="s-slipdow">Payslip day<span class="fh">Which day of that week</span></label>
           <select id="s-slipdow" style="width:132px;flex:none"></select>
         </div>
         <div class="field">
@@ -519,8 +527,8 @@ function defaults(){
   return {
     settings:{
       baseRate:12.00, holidayRate:12.00,
-      payMode:"cutoff", paydayDom:21, payslipDow:3, cutoffDow:3, paydayFriday:false,
-      payLabel:"start", rev:2,
+      payMode:"cutoff", paydayDom:21, payslipDow:3, payslipWeeks:1, cutoffDow:0, paydayFriday:false,
+      payLabel:"payday", rev:3,
       periodStart:1,
       taxCode:"1257L", scottish:false,
       niPT:1048, niUEL:4189, niRate:8, niUpperRate:2,
@@ -553,16 +561,17 @@ function load(){
     }
   }catch(e){}
 }
-/* rev 2: the cut-off is the Wednesday a week before the payslip, and a period
-   is named for the month it starts in rather than the month it is paid. */
+/* rev 3: the payslip is the payslip-day of the week BEFORE payday's week, which
+   puts the cut-off on the second Sunday before payday. */
 function migrate(stored){
   /* judge by what was actually saved: the merge above has already filled
      rev in from the defaults, so S.rev is never the old value */
-  if(!stored || stored.rev >= 2) return;
+  if(!stored || stored.rev >= 3) return;
   var fresh = defaults().settings;
   S.cutoffDow = fresh.cutoffDow;
+  S.payslipWeeks = fresh.payslipWeeks;
   S.payLabel = fresh.payLabel;
-  S.rev = 2;
+  S.rev = 3;
   save();
 }
 function save(){
@@ -602,6 +611,10 @@ var view = new Date(); view.setDate(1); view.setHours(0,0,0,0);
 /* Payday is a fixed day of the month; the payslip lands on the last payslip-weekday
    before it; the cut-off is the last cut-off-weekday before the payslip. Everything
    worked after a cut-off belongs to the next month's pay. */
+function weekStart(d){                            /* the Monday of d's week */
+  var g = (d.getDay() + 6) % 7;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - g);
+}
 function payDates(y, m){
   var payday = new Date(y, m, +S.paydayDom || 21);
   function backTo(from, dow){
@@ -609,7 +622,12 @@ function payDates(y, m){
     if(gap === 0) gap = 7;                       /* strictly before */
     return new Date(from.getFullYear(), from.getMonth(), from.getDate() - gap);
   }
-  var slip = backTo(payday, +S.payslipDow);
+  /* count whole weeks back from the week payday lands in, then take the
+     payslip day inside that week - so a Friday payday and a Monday payday
+     both get the same Wednesday relative to their own week */
+  var ws = weekStart(payday);
+  var slip = new Date(ws.getFullYear(), ws.getMonth(),
+                      ws.getDate() - 7 * (+S.payslipWeeks || 0) + ((+S.payslipDow + 6) % 7));
   var cutoff = backTo(slip, +S.cutoffDow);
   var paid = new Date(payday);
   if(S.paydayFriday){
@@ -1297,6 +1315,7 @@ function renderSetup(){
   num("s-pday", +S.periodStart > 1 ? S.periodStart : 21);
   num("s-payday", S.paydayDom);
   fillDows("s-slipdow", S.payslipDow); fillDows("s-cutdow", S.cutoffDow);
+  $("s-slipweeks").value = String(+S.payslipWeeks || 0);
   $("s-paylabel").value = S.payLabel || "start";
   $("labelHint").textContent = S.payLabel === "payday"
     ? "August = the pay landing in August" : "August = the run of shifts starting in August";
@@ -1435,6 +1454,7 @@ $("s-payday").addEventListener("input", function(){
   S.paydayDom = v; save(); render(); $("periodHint").textContent = rangeLabel(period());
 });
 $("s-slipdow").addEventListener("change", function(){ S.payslipDow = +this.value; save(); render(); $("periodHint").textContent = rangeLabel(period()); });
+$("s-slipweeks").addEventListener("change", function(){ S.payslipWeeks = +this.value; save(); render(); $("periodHint").textContent = rangeLabel(period()); });
 $("s-cutdow").addEventListener("change", function(){ S.cutoffDow = +this.value; save(); render(); $("periodHint").textContent = rangeLabel(period()); });
 $("s-paylabel").addEventListener("change", function(){ S.payLabel = this.value; save(); renderSetup(); render(); });
 $("s-pday").addEventListener("input", function(){

@@ -23,18 +23,21 @@ install it as an app.
 The default cycle is driven by payday rather than the calendar:
 
 - **Payday** is a fixed day of the month (the 21st by default).
-- **The payslip** comes out on the last chosen weekday before payday
-  (Wednesday).
-- **The cut-off** is the last chosen weekday before the payslip (Wednesday
-  again, which lands it a full week earlier).
+- **The payslip** is a chosen weekday (Wednesday) of a chosen week, counted back
+  from the week payday falls in — one week back by default.
+- **The cut-off** is the last chosen weekday before the payslip (Sunday).
+
+Pinning the payslip to a *week* rather than to "the last Wednesday before
+payday" is what keeps the cycle steady: a Friday payday and a Monday payday
+otherwise get wildly different gaps. With the defaults the cut-off always lands
+on the second Sunday before payday.
 
 A pay period runs from the day after one cut-off to the next, so it is always
-whole weeks — 28 or 35 days. Each period is named for the month it *starts* in
-and paid on the 21st of the month after, which is how a rota is usually talked
-about: the August run of shifts is 13 Aug – 9 Sep 2026, closing on Wed 9 Sep,
-with the payslip on Wed 16 Sep and the money on Mon 21 Sep. Flip **Each period
-is** to *Named for its payday* if you would rather have the month match the
-month you get paid.
+whole weeks — 28 or 35 days — and always Monday to Sunday. Each period is named
+for the month it is paid in: August 2026 is 13 Jul – 9 Aug, closing Sun 9 Aug,
+payslip Wed 12 Aug, money Fri 21 Aug. September 2026 is 10 Aug – 13 Sep, paid
+Mon 21 Sep. Switch **Each period is** to *Named for its first month* if you
+would rather a period took the name of the month the work starts in.
 
 Anything worked after a cut-off falls into the next period, which the app says
 on the Rota tab and handles by itself. Two other modes are available if your
