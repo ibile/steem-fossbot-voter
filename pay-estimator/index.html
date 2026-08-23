@@ -1,5 +1,11 @@
 <title>Rota to Payslip</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1D2A56">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rota Pay">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -215,6 +221,16 @@ details.acc .card-bd{padding-top:0}
 .split .k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .split .v{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
 .split .v.pos{color:var(--pos)}
+.split.three{grid-template-columns:repeat(3,1fr)}
+.split.three > div{padding:11px 10px}
+.split .v.date{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.split .when{font-size:11px;color:var(--muted);margin-top:2px;font-family:"IBM Plex Sans",sans-serif}
+.split .when.now{color:var(--warn);font-weight:600}
+.split .when.past{opacity:.6}
+.keynote{margin:0;padding:10px 14px;border-top:1px solid var(--hair-2);background:var(--surface-2);font-size:12.5px;color:var(--muted);line-height:1.5}
+.cell.cutoff{border-color:var(--accent);border-style:dashed}
+.timegr{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
+.syncrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
 </style>
 
 <header>
@@ -253,6 +269,11 @@ details.acc .card-bd{padding-top:0}
 
 <!-- ============ ROTA ============ -->
 <section class="panel" id="p-rota" role="tabpanel" aria-labelledby="tab-rota">
+  <div class="card" id="keyDates">
+    <div class="split three" id="keyGrid"></div>
+    <p class="keynote" id="keyNote"></p>
+  </div>
+
   <div class="card">
     <div class="card-hd">
       <h2>Shifts</h2>
@@ -285,6 +306,18 @@ details.acc .card-bd{padding-top:0}
         <div id="parseOut"></div>
       </div>
     </details>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h2>Calendar</h2></div>
+    <div class="card-bd">
+      <p class="hint" style="margin:0 0 10px">Save your shifts as a calendar file, then open it on your phone to add them to Google Calendar. Each event carries the shift name and hours &mdash; never your pay.</p>
+      <div class="syncrow">
+        <button class="btn primary" id="icsPeriod">This pay period</button>
+        <button class="btn" id="icsAll">Every shift</button>
+      </div>
+      <div id="icsNote"></div>
+    </div>
   </div>
 </section>
 
@@ -327,13 +360,32 @@ details.acc .card-bd{padding-top:0}
       <div class="field">
         <label for="s-period">Pay period<span class="fh" id="periodHint"></span></label>
         <select id="s-period" style="width:172px;flex:none">
-          <option value="1">Calendar month</option>
-          <option value="custom">Starts on a set day</option>
+          <option value="cutoff">Payday cut-off</option>
+          <option value="month">Calendar month</option>
+          <option value="startday">Starts on a set day</option>
         </select>
       </div>
       <div class="field" id="periodDayField" hidden>
         <label for="s-pday">Period starts on day<span class="fh">e.g. 21 = 21st to the 20th</span></label>
         <input type="number" min="1" max="28" id="s-pday" class="inp-xs" inputmode="numeric">
+      </div>
+      <div id="cutoffFields">
+        <div class="field">
+          <label for="s-payday">Payday<span class="fh">Day of the month you&rsquo;re paid</span></label>
+          <input type="number" min="1" max="31" id="s-payday" class="inp-xs" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="s-slipdow">Payslip comes out<span class="fh">The last one before payday</span></label>
+          <select id="s-slipdow" style="width:132px;flex:none"></select>
+        </div>
+        <div class="field">
+          <label for="s-cutdow">Cut-off<span class="fh">The last one before the payslip</span></label>
+          <select id="s-cutdow" style="width:132px;flex:none"></select>
+        </div>
+        <div class="field">
+          <label for="s-payfri">Weekend payday<span class="fh">Paid the Friday before if it falls on a weekend</span></label>
+          <button class="switch" id="s-payfri" role="switch" aria-checked="false" aria-label="Weekend payday"></button>
+        </div>
       </div>
     </div>
   </div>
@@ -342,7 +394,7 @@ details.acc .card-bd{padding-top:0}
     <div class="card-hd"><h2>Shift types</h2><button class="btn sm ghost" id="addType">+ Add</button></div>
     <div class="card-bd">
       <div class="tlist" id="typeList"></div>
-      <p class="hint" style="margin:11px 0 0"><b>Uplift</b> is the extra per hour on top of basic &mdash; your payslip shows these as their own line. <b>Own rate</b> replaces the basic rate entirely. <b>Unpaid</b> just marks the day.</p>
+      <p class="hint" style="margin:11px 0 0"><b>Starts</b> is only used for calendar events &mdash; leave it blank for an all-day entry. <b>Uplift</b> is the extra per hour on top of basic &mdash; your payslip shows these as their own line. <b>Own rate</b> replaces the basic rate entirely. <b>Unpaid</b> just marks the day.</p>
     </div>
   </div>
 
@@ -406,12 +458,18 @@ details.acc .card-bd{padding-top:0}
     <details class="acc">
       <summary>Backup &amp; reset</summary>
       <div class="card-bd">
-        <p class="hint" style="margin:0 0 9px">Everything lives in this browser only. Copy the backup code to move your setup to another phone or computer.</p>
+        <p class="hint" style="margin:0 0 9px">Everything lives in this browser only. Save a backup file to move your rates, shift types and shifts to the app on your phone &mdash; or anywhere else you open this.</p>
         <div class="btnrow">
+          <button class="btn primary" id="saveBackup">Save backup file</button>
+          <label class="btn" for="loadBackup">Restore from file</label>
+          <input type="file" accept=".json,application/json" id="loadBackup" style="display:none">
+        </div>
+        <div class="btnrow" style="margin-top:8px">
           <button class="btn" id="copyBackup">Copy backup code</button>
-          <button class="btn" id="pasteBackup">Restore from code</button>
+          <button class="btn" id="pasteBackup">Paste a code</button>
           <button class="btn danger ghost" id="resetAll">Reset everything</button>
         </div>
+        <div id="backupNote"></div>
       </div>
     </details>
   </div>
@@ -454,6 +512,7 @@ function defaults(){
   return {
     settings:{
       baseRate:12.00, holidayRate:12.00,
+      payMode:"cutoff", paydayDom:21, payslipDow:3, cutoffDow:0, paydayFriday:false,
       periodStart:1,
       taxCode:"1257L", scottish:false,
       niPT:1048, niUEL:4189, niRate:8, niUpperRate:2,
@@ -461,12 +520,12 @@ function defaults(){
       others:[]
     },
     types:[
-      {id:"day",   code:"D",   name:"Day shift",     hours:12, mode:"base",   extra:0, rate:0,     h:222},
-      {id:"night", code:"N",   name:"Night shift",   hours:12, mode:"base",   extra:0, rate:0,     h:268},
-      {id:"ot",    code:"OT",  name:"Overtime",      hours:12, mode:"base",   extra:1, rate:0,     h:30},
-      {id:"bh",    code:"BH",  name:"Bank holiday",  hours:12, mode:"base",   extra:1, rate:0,     h:172},
-      {id:"al",    code:"AL",  name:"Holiday",       hours:12, mode:"rate",   extra:0, rate:12.00, h:140},
-      {id:"off",   code:"OFF", name:"Rest day",      hours:0,  mode:"unpaid", extra:0, rate:0,     h:220}
+      {id:"day",   code:"D",   name:"Day shift",     hours:12, mode:"base",   extra:0, rate:0,     start:"07:00", h:222},
+      {id:"night", code:"N",   name:"Night shift",   hours:12, mode:"base",   extra:0, rate:0,     start:"19:00", h:268},
+      {id:"ot",    code:"OT",  name:"Overtime",      hours:12, mode:"base",   extra:1, rate:0,     start:"07:00", h:30},
+      {id:"bh",    code:"BH",  name:"Bank holiday",  hours:12, mode:"base",   extra:1, rate:0,     start:"07:00", h:172},
+      {id:"al",    code:"AL",  name:"Holiday",       hours:12, mode:"rate",   extra:0, rate:12.00, start:"",      h:140},
+      {id:"off",   code:"OFF", name:"Rest day",      hours:0,  mode:"unpaid", extra:0, rate:0,     start:"",      h:220}
     ],
     shifts:{}
   };
@@ -519,10 +578,39 @@ function toast(msg){
 /* ---------------- pay period ---------------- */
 var view = new Date(); view.setDate(1); view.setHours(0,0,0,0);
 
+/* Payday is a fixed day of the month; the payslip lands on the last payslip-weekday
+   before it; the cut-off is the last cut-off-weekday before the payslip. Everything
+   worked after a cut-off belongs to the next month's pay. */
+function payDates(y, m){
+  var payday = new Date(y, m, +S.paydayDom || 21);
+  function backTo(from, dow){
+    var gap = (from.getDay() - dow + 7) % 7;
+    if(gap === 0) gap = 7;                       /* strictly before */
+    return new Date(from.getFullYear(), from.getMonth(), from.getDate() - gap);
+  }
+  var slip = backTo(payday, +S.payslipDow);
+  var cutoff = backTo(slip, +S.cutoffDow);
+  var paid = new Date(payday);
+  if(S.paydayFriday){
+    if(paid.getDay() === 0) paid.setDate(paid.getDate() - 2);
+    else if(paid.getDay() === 6) paid.setDate(paid.getDate() - 1);
+  }
+  return {payday:paid, nominal:payday, slip:slip, cutoff:cutoff};
+}
 function period(){
-  var y = view.getFullYear(), m = view.getMonth(), sd = parseInt(S.periodStart,10) || 1;
-  if(sd <= 1) return {start:new Date(y,m,1), end:new Date(y,m+1,0)};
-  return {start:new Date(y,m-1,sd), end:new Date(y,m,sd-1)};
+  var y = view.getFullYear(), m = view.getMonth();
+  if(S.payMode === "cutoff"){
+    var end = payDates(y, m).cutoff, prev = payDates(y, m-1).cutoff;
+    return {start:new Date(prev.getFullYear(), prev.getMonth(), prev.getDate()+1), end:end};
+  }
+  var sd = parseInt(S.periodStart,10) || 1;
+  if(S.payMode === "startday" && sd > 1) return {start:new Date(y,m-1,sd), end:new Date(y,m,sd-1)};
+  return {start:new Date(y,m,1), end:new Date(y,m+1,0)};
+}
+function dayLabel(d){ return DAYS[d.getDay()].slice(0,3) + " " + d.getDate() + " " + MON[d.getMonth()]; }
+function daysUntil(d){
+  var t = new Date(); t.setHours(0,0,0,0);
+  return Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate()) - t) / 86400000);
 }
 function eachDay(p){
   var out=[], d=new Date(p.start);
@@ -657,7 +745,11 @@ function render(){
   var p = c.period;
 
   $("periodLbl").textContent = MONTHS[view.getMonth()] + " " + view.getFullYear();
-  $("hdRange").textContent = rangeLabel(p) + (S.periodStart > 1 ? " · paid for " + MONTHS[view.getMonth()] : "");
+  var K = payDates(view.getFullYear(), view.getMonth());
+  $("hdRange").textContent = rangeLabel(p) +
+    (S.payMode === "cutoff" ? " · paid " + dayLabel(K.payday) :
+     S.periodStart > 1 ? " · paid for " + MONTHS[view.getMonth()] : "");
+  renderKeyDates(K, p);
   var parts = c.net.toFixed(2).split(".");
   $("netBig").innerHTML = GBP + parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "<small>." + parts[1] + "</small>";
   $("hdShifts").textContent = c.shifts;
@@ -674,6 +766,26 @@ function render(){
   renderSlip(c);
 }
 
+function renderKeyDates(K, p){
+  var card = $("keyDates");
+  if(S.payMode !== "cutoff"){ card.hidden = true; return; }
+  card.hidden = false;
+  var toCut = daysUntil(K.cutoff), toPay = daysUntil(K.payday);
+  function cell(k, d, n){
+    var when = n === 0 ? "today" : n > 0 ? "in " + n + " day" + (n===1?"":"s") : "done";
+    return '<div><div class="k">' + k + '</div><div class="v date">' + dayLabel(d) +
+           '</div><div class="when' + (n === 0 ? " now" : n < 0 ? " past" : "") + '">' + when + '</div></div>';
+  }
+  $("keyGrid").innerHTML = cell("Cut-off", K.cutoff, toCut) + cell("Payslip", K.slip, daysUntil(K.slip)) +
+                           cell("Payday", K.payday, toPay);
+  var note;
+  if(toCut > 0) note = "Anything you work after " + dayLabel(K.cutoff) + " lands in " +
+                       MONTHS[(view.getMonth()+1) % 12] + "'s pay instead.";
+  else note = "This period closed on " + dayLabel(K.cutoff) + ". Hours since then are in " +
+              MONTHS[(view.getMonth()+1) % 12] + "'s pay — use the arrow above to see it.";
+  $("keyNote").textContent = note;
+}
+
 function renderGrid(p){
   var g = $("grid"), html = "", today = iso(new Date());
   var lead = (p.start.getDay() + 6) % 7;
@@ -684,6 +796,7 @@ function renderGrid(p){
     var cls = "cell", hue = 220, inner = "";
     if(key === today) cls += " today";
     else if(d < now) cls += " past";
+    if(S.payMode === "cutoff" && i === days.length - 1) cls += " cutoff";
     if(t){
       cls += " filled"; hue = t.h;
       if(t.mode === "unpaid") cls += " unpaid";
@@ -975,7 +1088,15 @@ function parseRota(text){
     }
 
     if(!date && dayNum !== null){
-      for(var q=0;q<days.length;q++){ if(days[q].getDate() === dayNum){ date = days[q]; break; } }
+      /* a 5-week period can hold the same day number twice - take the one
+         nearest today, which is almost always the one being written down */
+      var now = new Date(); now.setHours(0,0,0,0);
+      var best = null;
+      for(var q=0;q<days.length;q++){
+        if(days[q].getDate() !== dayNum) continue;
+        if(!best || Math.abs(days[q]-now) < Math.abs(best-now)) best = days[q];
+      }
+      date = best;
     }
     if(!date || !typeId){ missed.push(raw); continue; }
 
@@ -1036,6 +1157,89 @@ $("copyPrompt").addEventListener("click", function(){
   copyText(txt, "Prompt copied — send it to Claude with your rota photo");
 });
 
+/* ---------------- calendar file ---------------- */
+function pad2(n){ return (n < 10 ? "0" : "") + n; }
+function icsStamp(d){
+  return d.getUTCFullYear() + pad2(d.getUTCMonth()+1) + pad2(d.getUTCDate()) + "T" +
+         pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + "Z";
+}
+function icsLocal(d){
+  return d.getFullYear() + pad2(d.getMonth()+1) + pad2(d.getDate()) + "T" +
+         pad2(d.getHours()) + pad2(d.getMinutes()) + "00";
+}
+function icsDay(d){ return d.getFullYear() + pad2(d.getMonth()+1) + pad2(d.getDate()); }
+function icsEsc(t){
+  return String(t).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
+}
+function icsFold(line){
+  if(line.length <= 74) return line;
+  var out = line.slice(0,74), rest = line.slice(74);
+  while(rest.length > 73){ out += "\r\n " + rest.slice(0,73); rest = rest.slice(73); }
+  return out + "\r\n " + rest;
+}
+/* One event per day, keyed on the date, so re-importing updates a shift
+   rather than doubling it up. Rest days and pay figures are left out. */
+function buildICS(keys){
+  var out = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Rota to Payslip//EN",
+             "CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:Shifts"];
+  var stamp = icsStamp(new Date()), n = 0;
+  for(var i=0;i<keys.length;i++){
+    var key = keys[i], rec = DB.shifts[key];
+    if(!rec) continue;
+    var t = typeById(rec.t);
+    if(!t || t.mode === "unpaid") continue;
+    var h = (rec.h === null || rec.h === undefined) ? +t.hours : +rec.h;
+    if(!(h > 0)) continue;
+    var pp = key.split("-"), y = +pp[0], mo = +pp[1]-1, dd = +pp[2];
+    out.push("BEGIN:VEVENT", "UID:" + key + "@rota-payslip", "DTSTAMP:" + stamp);
+    if(t.start){
+      var hm = String(t.start).split(":");
+      var st = new Date(y, mo, dd, parseInt(hm[0],10) || 0, parseInt(hm[1],10) || 0);
+      out.push("DTSTART:" + icsLocal(st), "DTEND:" + icsLocal(new Date(st.getTime() + h*3600000)));
+    } else {
+      out.push("DTSTART;VALUE=DATE:" + icsDay(new Date(y,mo,dd)),
+               "DTEND;VALUE=DATE:" + icsDay(new Date(y,mo,dd+1)));
+    }
+    out.push("SUMMARY:" + icsEsc(t.name), "DESCRIPTION:" + icsEsc(hrs(h) + " hours"),
+             "TRANSP:OPAQUE", "END:VEVENT");
+    n++;
+  }
+  out.push("END:VCALENDAR");
+  return {text: out.map(icsFold).join("\r\n") + "\r\n", count:n};
+}
+function inPreview(){ return !!(window.claude && typeof window.claude.use === "function"); }
+function previewNote(){
+  $("icsNote").innerHTML = '<div class="warnbox">Calendar files can only be saved from the downloaded app &mdash; this preview isn&rsquo;t allowed to hand files to your phone.</div>';
+}
+function exportICS(scope){
+  var keys = scope === "period" ? eachDay(period()).map(iso) : Object.keys(DB.shifts).sort();
+  var built = buildICS(keys);
+  if(!built.count){ toast("No shifts to add for that"); return; }
+  var name = "shifts-" + (scope === "period"
+    ? MONTHS[view.getMonth()].toLowerCase() + "-" + view.getFullYear() : "all") + ".ics";
+  var done = built.count + " shift" + (built.count === 1 ? "" : "s");
+  if(inPreview()){
+    window.claude.use("downloads").then(function(dl){
+      if(!dl) return previewNote();
+      dl.save({filename:name, data:built.text}).then(function(){ toast(done + " saved"); }, previewNote);
+    }, previewNote);
+    return;
+  }
+  try{
+    var blob = new Blob([built.text], {type:"text/calendar;charset=utf-8"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = name; a.style.display = "none";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 2000);
+    toast(done + " saved as " + name);
+  }catch(e){
+    $("icsNote").innerHTML = '<div class="warnbox">This browser wouldn&rsquo;t save the file. Try opening the app from your home screen instead.</div>';
+  }
+}
+$("icsPeriod").addEventListener("click", function(){ exportICS("period"); });
+$("icsAll").addEventListener("click", function(){ exportICS("all"); });
+
 /* ---------------- clipboard ---------------- */
 function copyText(txt, okMsg){
   function fallback(){
@@ -1060,9 +1264,13 @@ function num(id, val){ var el = $(id); if(el) el.value = val; }
 
 function renderSetup(){
   num("s-base", S.baseRate); num("s-hol", S.holidayRate);
-  $("s-period").value = (+S.periodStart > 1) ? "custom" : "1";
-  $("periodDayField").hidden = !(+S.periodStart > 1);
+  $("s-period").value = S.payMode || "cutoff";
+  $("periodDayField").hidden = S.payMode !== "startday";
+  $("cutoffFields").hidden = S.payMode !== "cutoff";
   num("s-pday", +S.periodStart > 1 ? S.periodStart : 21);
+  num("s-payday", S.paydayDom);
+  fillDows("s-slipdow", S.payslipDow); fillDows("s-cutdow", S.cutoffDow);
+  setSwitch("s-payfri", S.paydayFriday);
   $("periodHint").textContent = rangeLabel(period());
   num("s-taxcode", S.taxCode);
   num("s-nipt", S.niPT); num("s-niuel", S.niUEL); num("s-nirate", S.niRate);
@@ -1070,6 +1278,11 @@ function renderSetup(){
   setSwitch("s-pen-on", S.pensionOn); setSwitch("s-pen-ras", S.pensionRAS); setSwitch("s-scot", S.scottish);
   $("penBody").style.display = S.pensionOn ? "" : "none";
   renderTypes(); renderDeds();
+}
+function fillDows(id, val){
+  var el = $(id), html = "";
+  for(var i=0;i<7;i++) html += '<option value="' + i + '"' + (i === +val ? " selected" : "") + '>' + DAYS[i] + '</option>';
+  el.innerHTML = html;
 }
 function setSwitch(id, on){ $(id).setAttribute("aria-checked", on ? "true" : "false"); }
 
@@ -1087,16 +1300,19 @@ function renderTypes(){
       '</div>' +
       '<div class="trow-gr">' +
         '<div><label>Code</label><input data-f="code" value="' + esc(t.code) + '" maxlength="4"></div>' +
+        '<div><label>Starts</label><input type="time" data-f="start" value="' + esc(t.start || "") + '"></div>' +
         '<div><label>Hours</label><input type="number" step="0.25" data-f="hours" value="' + t.hours + '" inputmode="decimal"></div>' +
+      '</div>' +
+      '<div class="trow-gr" style="grid-template-columns:1fr 1fr">' +
         '<div><label>Paid as</label><select data-f="mode">' +
           '<option value="base"' + (t.mode==="base"?" selected":"") + '>Basic + uplift</option>' +
           '<option value="rate"' + (t.mode==="rate"?" selected":"") + '>Own rate</option>' +
           '<option value="unpaid"' + (t.mode==="unpaid"?" selected":"") + '>Unpaid</option>' +
         '</select></div>' +
+        (t.mode === "unpaid" ? "" :
+        '<div><label>' + amtLabel + '</label>' +
+        '<input type="number" step="0.01" data-f="' + (t.mode==="rate"?"rate":"extra") + '" value="' + amtVal + '" inputmode="decimal"></div>') +
       '</div>' +
-      (t.mode === "unpaid" ? "" :
-      '<div class="trow-gr" style="grid-template-columns:1fr"><div><label>' + amtLabel + '</label>' +
-      '<input type="number" step="0.01" data-f="' + (t.mode==="rate"?"rate":"extra") + '" value="' + amtVal + '" inputmode="decimal"></div></div>') +
     '</div>';
   }
   $("typeList").innerHTML = html;
@@ -1106,7 +1322,7 @@ $("typeList").addEventListener("input", function(e){
   var row = e.target.closest(".trow"); if(!row) return;
   var t = DB.types[+row.dataset.i], f = e.target.dataset.f;
   if(!t || !f) return;
-  if(f === "name" || f === "code") t[f] = e.target.value;
+  if(f === "name" || f === "code" || f === "start") t[f] = e.target.value;
   else if(f === "mode"){ t.mode = e.target.value; save(); renderTypes(); render(); return; }
   else t[f] = parseFloat(e.target.value) || 0;
   save(); render();
@@ -1130,7 +1346,7 @@ $("typeList").addEventListener("click", function(e){
 });
 $("addType").addEventListener("click", function(){
   DB.types.push({id:"t" + Date.now().toString(36), code:"NEW", name:"New shift", hours:12,
-                 mode:"base", extra:0, rate:0, h:HUES[DB.types.length % HUES.length]});
+                 mode:"base", extra:0, rate:0, start:"07:00", h:HUES[DB.types.length % HUES.length]});
   save(); renderTypes(); render();
 });
 
@@ -1179,12 +1395,17 @@ $("addDed").addEventListener("click", function(){
 });
 $("s-taxcode").addEventListener("input", function(){ S.taxCode = this.value.toUpperCase(); save(); render(); });
 $("s-period").addEventListener("change", function(){
-  if(this.value === "custom"){
-    S.periodStart = parseInt($("s-pday").value,10) || 21;
-    $("periodDayField").hidden = false;
-  } else { S.periodStart = 1; $("periodDayField").hidden = true; }
-  save(); render(); $("periodHint").textContent = rangeLabel(period());
+  S.payMode = this.value;
+  if(S.payMode === "startday" && !(+S.periodStart > 1)) S.periodStart = parseInt($("s-pday").value,10) || 21;
+  save(); renderSetup(); render();
 });
+$("s-payday").addEventListener("input", function(){
+  var v = parseInt(this.value,10);
+  if(!v || v < 1) v = 1; if(v > 31) v = 31;
+  S.paydayDom = v; save(); render(); $("periodHint").textContent = rangeLabel(period());
+});
+$("s-slipdow").addEventListener("change", function(){ S.payslipDow = +this.value; save(); render(); $("periodHint").textContent = rangeLabel(period()); });
+$("s-cutdow").addEventListener("change", function(){ S.cutoffDow = +this.value; save(); render(); $("periodHint").textContent = rangeLabel(period()); });
 $("s-pday").addEventListener("input", function(){
   var v = parseInt(this.value,10);
   if(!v || v < 1) v = 1; if(v > 28) v = 28;
@@ -1200,10 +1421,50 @@ function toggle(id, key, after){
 }
 toggle("s-pen-on","pensionOn", function(){ $("penBody").style.display = S.pensionOn ? "" : "none"; });
 toggle("s-pen-ras","pensionRAS");
+toggle("s-payfri","paydayFriday");
 toggle("s-scot","scottish");
 
 /* ---------------- backup ---------------- */
 function encode(){ return btoa(unescape(encodeURIComponent(JSON.stringify(DB)))); }
+
+function applyRestore(d){
+  if(!d || !d.settings || !d.types || !d.shifts) throw new Error("shape");
+  DB = {settings:Object.assign(defaults().settings, d.settings), types:d.types, shifts:d.shifts};
+  S = DB.settings;
+  save(); renderSetup(); render();
+}
+$("saveBackup").addEventListener("click", function(){
+  var text = JSON.stringify(DB, null, 1), name = "rota-payslip-backup.json";
+  if(inPreview()){
+    window.claude.use("downloads").then(function(dl){
+      if(!dl) return copyText(encode(), "Backup code copied instead");
+      dl.save({filename:name, data:text}).then(function(){ toast("Backup saved"); }, function(){
+        copyText(encode(), "Backup code copied instead");
+      });
+    });
+    return;
+  }
+  try{
+    var url = URL.createObjectURL(new Blob([text], {type:"application/json"}));
+    var a = document.createElement("a");
+    a.href = url; a.download = name; a.style.display = "none";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 2000);
+    toast("Backup saved as " + name);
+  }catch(e){ copyText(encode(), "Backup code copied instead"); }
+});
+$("loadBackup").addEventListener("change", function(e){
+  var f = e.target.files && e.target.files[0];
+  if(!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    try{ applyRestore(JSON.parse(fr.result)); toast("Restored from " + f.name); }
+    catch(err){ toast("That file wasn't a backup from this app"); }
+  };
+  fr.onerror = function(){ toast("Couldn't read that file"); };
+  fr.readAsText(f);
+  e.target.value = "";
+});
 $("copyBackup").addEventListener("click", function(){
   copyText(encode(), "Backup code copied");
 });
@@ -1219,11 +1480,8 @@ $("pasteBackup").addEventListener("click", function(){
   box.querySelector("[data-go]").addEventListener("click", function(){
     var v = box.querySelector("textarea").value.trim();
     try{
-      var d = JSON.parse(decodeURIComponent(escape(atob(v))));
-      if(!d.settings || !d.types || !d.shifts) throw new Error("shape");
-      DB = {settings:Object.assign(defaults().settings, d.settings), types:d.types, shifts:d.shifts};
-      S = DB.settings;
-      save(); renderSetup(); render(); box.remove();
+      applyRestore(JSON.parse(decodeURIComponent(escape(atob(v)))));
+      box.remove();
       toast("Restored");
     }catch(err){ toast("That code didn't look right"); }
   });
@@ -1243,8 +1501,21 @@ window.addEventListener("resize", syncHeader);
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncHeader);
 
 load();
+/* open on the period today actually falls in - past the cut-off, you are
+   already earning next month's pay */
+if(S.payMode === "cutoff"){
+  var t0 = new Date(); t0.setHours(0,0,0,0);
+  for(var g=0; g<3 && t0 > payDates(view.getFullYear(), view.getMonth()).cutoff; g++){
+    view.setMonth(view.getMonth()+1);
+  }
+}
 renderPhoto();
 render();
 syncHeader();
+if(inPreview()) $("icsNote").innerHTML =
+  '<p class="hint" style="margin:10px 0 0">Calendar files save from the installed app, not from this preview.</p>';
+if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+  navigator.serviceWorker.register("./service-worker.js").catch(function(){});
+}
 })();
 </script>

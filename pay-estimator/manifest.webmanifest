@@ -1,0 +1,17 @@
+{
+  "name": "Rota to Payslip",
+  "short_name": "Rota Pay",
+  "description": "Enter your shifts and see what lands in your account on payday.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#E9ECF3",
+  "theme_color": "#1D2A56",
+  "categories": ["productivity", "finance"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
