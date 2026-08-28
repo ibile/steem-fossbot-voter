@@ -419,7 +419,7 @@ details.acc .card-bd{padding-top:0}
     <div class="card-hd"><h2>Shift types</h2><button class="btn sm ghost" id="addType">+ Add</button></div>
     <div class="card-bd">
       <div class="tlist" id="typeList"></div>
-      <p class="hint" style="margin:11px 0 0"><b>Top-up only</b> is for hours that are already inside another entry and just earn an enhancement &mdash; bank holiday hours inside a night shift, say. They add the extra per hour and nothing else, so the hours are never counted twice. <b>Starts</b> is only used for calendar events &mdash; leave it blank for an all-day entry. <b>Uplift</b> is the extra per hour on top of basic &mdash; your payslip shows these as their own line. <b>Own rate</b> replaces the basic rate entirely. <b>Unpaid</b> just marks the day.</p>
+      <p class="hint" style="margin:11px 0 0"><b>&pound;/hr or &times; basic</b> &mdash; tap the button beside an amount to switch. A multiplier is the total rate for those hours, so double pay is &times;2, and it follows your basic rate when that changes. <b>Top-up only</b> is for hours that are already inside another entry and just earn an enhancement &mdash; bank holiday hours inside a night shift, say. They add the extra per hour and nothing else, so the hours are never counted twice. <b>Starts</b> is only used for calendar events &mdash; leave it blank for an all-day entry. <b>Uplift</b> is the extra per hour on top of basic &mdash; your payslip shows these as their own line. <b>Own rate</b> replaces the basic rate entirely. <b>Unpaid</b> just marks the day.</p>
     </div>
   </div>
 
@@ -542,7 +542,7 @@ function defaults(){
     settings:{
       baseRate:12.00, holidayRate:12.00,
       payMode:"cutoff", paydayDom:21, payslipDow:3, payslipWeeks:1, cutoffDow:0, paydayFriday:false,
-      payLabel:"payday", rev:4,
+      payLabel:"payday", rev:5,
       periodStart:1,
       taxCode:"1257L", scottish:false,
       niPT:1048, niUEL:4189, niRate:8, niUpperRate:2,
@@ -553,9 +553,9 @@ function defaults(){
       {id:"day",   code:"D",   name:"Day shift",     hours:12, mode:"base",   extra:0, rate:0,     start:"07:00", h:222},
       {id:"night", code:"N",   name:"Night shift",   hours:12, mode:"base",   extra:0, rate:0,     start:"19:00", h:268},
       {id:"ot",    code:"OT",  name:"Overtime",      hours:12, mode:"base",   extra:1, rate:0,     start:"07:00", h:30},
-      {id:"bh",    code:"BH",  name:"Bank holiday",  hours:12, mode:"base",   extra:1, rate:0,     start:"07:00", h:172},
+      {id:"bh",    code:"BH",  name:"Bank holiday",  hours:12, mode:"rate",   extra:0, rate:0, unit:"mult", mult:2, start:"07:00", h:172},
       {id:"al",    code:"AL",  name:"Holiday",       hours:12, mode:"rate",   extra:0, rate:12.00, start:"",      h:140},
-      {id:"bht",   code:"BHT", name:"Bank holiday hours", hours:4, mode:"topup", extra:1, rate:0,   start:"",      h:172},
+      {id:"bht",   code:"BHT", name:"Bank holiday hours", hours:4, mode:"topup", extra:0, rate:0, unit:"mult", mult:2, start:"", h:172},
       {id:"ott",   code:"OTT", name:"Overtime hours",   hours:4,  mode:"topup",  extra:1, rate:0,     start:"",      h:30},
       {id:"off",   code:"OFF", name:"Rest day",      hours:0,  mode:"unpaid", extra:0, rate:0,     start:"",      h:220}
     ],
@@ -586,12 +586,20 @@ function migrate(stored){
   /* judge by what was actually saved: the merge above has already filled
      rev in from the defaults, so S.rev is never the old value */
   var was = (stored && +stored.rev) || 0;
-  if(was >= 4) return;
+  if(was >= 5) return;
   var fresh = defaults();
   if(was < 3){
     S.cutoffDow = fresh.settings.cutoffDow;
     S.payslipWeeks = fresh.settings.payslipWeeks;
     S.payLabel = fresh.settings.payLabel;
+  }
+  if(was < 5){
+    for(var m=0;m<DB.types.length;m++){
+      var mt = DB.types[m];
+      if(mt.unit) continue;
+      if(mt.id === "bh"){ mt.mode = "rate"; mt.unit = "mult"; mt.mult = 2; }
+      else if(mt.id === "bht"){ mt.mode = "topup"; mt.unit = "mult"; mt.mult = 2; }
+    }
   }
   var hasTopup = false, i;
   for(i=0;i<DB.types.length;i++) if(DB.types[i].mode === "topup") hasTopup = true;
@@ -600,7 +608,7 @@ function migrate(stored){
       if(fresh.types[i].mode === "topup") DB.types.push(fresh.types[i]);
     }
   }
-  S.rev = 4;
+  S.rev = 5;
   save();
 }
 function save(){
@@ -719,11 +727,21 @@ function rangeLabel(p){
 }
 
 /* ---------------- the sums ---------------- */
+/* A type's money is either a fixed £/hr or a multiple of basic. A multiplier
+   always states the TOTAL rate for those hours, so the extra on top of basic
+   is (multiplier - 1) x basic - double pay is x2, i.e. one extra basic. */
+function typeRate(t){
+  return t.unit === "mult" ? (+t.mult || 0) * (+S.baseRate || 0) : (+t.rate || 0);
+}
+function typeExtra(t){
+  if(t.unit === "mult") return Math.max(0, ((+t.mult || 0) - 1) * (+S.baseRate || 0));
+  return (+t.extra || 0);
+}
 function shiftPay(t, h){
   if(t.mode === "unpaid" || h <= 0) return 0;
-  if(t.mode === "rate") return h * (+t.rate || 0);
-  if(t.mode === "topup") return h * (+t.extra || 0);   /* basic already counted */
-  return h * ((+S.baseRate || 0) + (+t.extra || 0));
+  if(t.mode === "rate") return h * typeRate(t);
+  if(t.mode === "topup") return h * typeExtra(t);      /* basic already counted */
+  return h * ((+S.baseRate || 0) + typeExtra(t));
 }
 
 function taxOn(gross){
@@ -802,7 +820,7 @@ function calc(){
       } else {
         shifts++; totalHours += h;
         baseHours += h;
-        if(+t.extra > 0) uplift[t.id] = (uplift[t.id] || 0) + h;
+        if(typeExtra(t) > 0) uplift[t.id] = (uplift[t.id] || 0) + h;
       }
       if(days[i] < today){ soFarGross += shiftPay(t, h); if(t.mode !== "topup") soFarShifts++; }
     }
@@ -812,12 +830,12 @@ function calc(){
   if(baseHours > 0) lines.push({name:"Basic pay", hours:baseHours, rate:+S.baseRate, amount:r2(baseHours * (+S.baseRate||0))});
   for(var id in rated){ if(!rated.hasOwnProperty(id)) continue;
     var rt = typeById(id);
-    lines.push({name:rt.name + " pay", hours:rated[id], rate:+rt.rate, amount:r2(rated[id] * (+rt.rate||0))});
+    lines.push({name:rt.name + " pay", hours:rated[id], rate:typeRate(rt), amount:r2(rated[id] * typeRate(rt))});
   }
   for(var uid in uplift){ if(!uplift.hasOwnProperty(uid)) continue;
     var ut = typeById(uid);
     lines.push({name:ut.mode === "topup" ? ut.name : ut.name + " uplift",
-                hours:uplift[uid], rate:+ut.extra, amount:r2(uplift[uid] * (+ut.extra||0))});
+                hours:uplift[uid], rate:typeExtra(ut), amount:r2(uplift[uid] * typeExtra(ut))});
   }
   var gross = 0;
   for(var k=0;k<lines.length;k++) gross += lines[k].amount;
@@ -1039,8 +1057,10 @@ function renderEntryList(ents){
     var t = typeById(ents[i].t);
     if(!t){ continue; }
     var h = entryHours(ents[i], t);
-    var note = t.mode === "topup" ? "enhancement only" : t.mode === "unpaid" ? "unpaid"
-             : t.mode === "rate" ? money(t.rate) + "/hr" : money((+S.baseRate) + (+t.extra || 0)) + "/hr";
+    var note = t.mode === "topup" ? "top-up of " + money(typeExtra(t)) + "/hr"
+             : t.mode === "unpaid" ? "unpaid"
+             : t.mode === "rate" ? money(typeRate(t)) + "/hr"
+             : money((+S.baseRate) + typeExtra(t)) + "/hr";
     html += '<div class="ent' + (i === editIndex ? " sel" : "") + '" style="--h:' + t.h + '">' +
             '<button class="ent-pick" data-i="' + i + '" style="display:flex;align-items:center;gap:9px;flex:1;min-width:0;text-align:left">' +
             '<i>' + esc(t.code) + '</i><span class="en">' + esc(t.name) + '<small>' + note + '</small></span>' +
@@ -1077,9 +1097,10 @@ function renderPicks(){
   for(var i=0;i<DB.types.length;i++){
     var t = DB.types[i], on = t.id === sheetType;
     var pay = t.mode === "unpaid" ? "unpaid"
-            : t.mode === "topup" ? "+" + money(t.extra) + "/hr on top"
-            : t.mode === "rate" ? money(t.rate) + "/hr"
-            : (+t.extra > 0 ? money((+S.baseRate) + (+t.extra)) + "/hr" : money(+S.baseRate) + "/hr");
+            : t.mode === "topup" ? "+" + money(typeExtra(t)) + "/hr on top"
+            : t.mode === "rate" ? money(typeRate(t)) + "/hr"
+            : money((+S.baseRate) + typeExtra(t)) + "/hr";
+    if(t.unit === "mult") pay += " (\u00d7" + (+t.mult || 0) + ")";
     html += '<button class="pick' + (t.mode==="unpaid"?" unpaid":"") + '" style="--h:' + t.h + '" data-id="' + t.id + '" aria-pressed="' + (on?"true":"false") + '">' +
             '<i>' + esc(t.code) + '</i><span><span class="pn">' + esc(t.name) + '</span>' +
             '<span class="pp">' + pay + '</span></span></button>';
@@ -1487,10 +1508,16 @@ function renderTypes(){
   var html = "";
   for(var i=0;i<DB.types.length;i++){
     var t = DB.types[i];
-    var amtLabel = t.mode === "rate" ? "Rate " + GBP + "/hr"
+    var isMult = t.unit === "mult";
+    var amtLabel = isMult ? "Paid &times; basic"
+                 : t.mode === "rate" ? "Rate " + GBP + "/hr"
                  : t.mode === "topup" ? "Top-up " + GBP + "/hr"
-                 : t.mode === "base" ? "Uplift " + GBP + "/hr" : "&mdash;";
-    var amtVal = t.mode === "rate" ? t.rate : t.extra;
+                 : "Uplift " + GBP + "/hr";
+    var amtField = isMult ? "mult" : (t.mode === "rate" ? "rate" : "extra");
+    var amtVal = isMult ? (t.mult == null ? 2 : t.mult) : (t.mode === "rate" ? t.rate : t.extra);
+    var resolved = t.mode === "rate" ? money(typeRate(t)) + "/hr"
+                 : t.mode === "topup" ? "+" + money(typeExtra(t)) + "/hr on top of basic"
+                 : money((+S.baseRate) + typeExtra(t)) + "/hr all in";
     html += '<div class="trow" style="--h:' + t.h + '" data-i="' + i + '">' +
       '<div class="trow-hd">' +
         '<button class="tcode" data-act="hue" title="Change colour">' + esc(t.code) + '</button>' +
@@ -1511,7 +1538,12 @@ function renderTypes(){
         '</select></div>' +
         (t.mode === "unpaid" ? "" :
         '<div><label>' + amtLabel + '</label>' +
-        '<input type="number" step="0.01" data-f="' + (t.mode==="rate"?"rate":"extra") + '" value="' + amtVal + '" inputmode="decimal"></div>') +
+        '<div style="display:flex;gap:6px">' +
+          '<input type="number" step="' + (isMult ? "0.25" : "0.01") + '" data-f="' + amtField + '" value="' + amtVal + '" inputmode="decimal">' +
+          '<button class="btn sm ghost" data-act="unit" style="flex:none;min-width:66px" title="Switch between pounds an hour and a multiple of basic">' +
+          (isMult ? "&times; basic" : GBP + "/hr") + '</button>' +
+        '</div>' +
+        '<span class="fh" style="display:block;margin-top:4px">' + resolved + '</span></div>') +
       '</div>' +
     '</div>';
   }
@@ -1530,7 +1562,12 @@ $("typeList").addEventListener("input", function(e){
 $("typeList").addEventListener("click", function(e){
   var row = e.target.closest(".trow"); if(!row) return;
   var i = +row.dataset.i, act = e.target.dataset.act;
-  if(act === "hue"){
+  if(act === "unit"){
+    var ut = DB.types[i];
+    if(ut.unit === "mult"){ ut.unit = "gbp"; }
+    else { ut.unit = "mult"; if(ut.mult == null) ut.mult = 2; }
+    save(); renderTypes(); render();
+  } else if(act === "hue"){
     var cur = HUES.indexOf(DB.types[i].h);
     DB.types[i].h = HUES[(cur + 1) % HUES.length];
     save(); renderTypes(); render();
@@ -1598,6 +1635,7 @@ $("addDed").addEventListener("click", function(){
   $(pair[0]).addEventListener("input", function(){
     S[pair[1]] = parseFloat(this.value) || 0;
     save(); render();
+    if(pair[1] === "baseRate") renderTypes();   /* multipliers follow basic */
   });
 });
 $("s-taxcode").addEventListener("input", function(){ S.taxCode = this.value.toUpperCase(); save(); render(); });

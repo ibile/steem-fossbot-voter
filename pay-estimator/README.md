@@ -78,11 +78,32 @@ Shift types have four pay modes:
 | **Top-up only** | Earn *only* the extra per hour — no basic, no hours added |
 | Unpaid | Marks the day, pays nothing |
 
-**Top-up only** is the one that makes bank holidays work. If a bank holiday
-falls inside a night shift, the shift is already paying basic for those hours;
-the enhancement is a separate line on the payslip covering a subset of the same
-hours. Entering it as an ordinary shift would count those hours twice. So a
-night shift with four qualifying bank-holiday hours is two entries:
+Every amount can be entered as **£/hr** or as a **× basic** multiplier — tap the
+button beside the field to switch. A multiplier states the total rate for those
+hours, so double pay is ×2, and it follows the basic rate when that changes
+rather than going stale after a pay rise.
+
+### Bank holidays, both ways
+
+Employers express double pay one of two ways, and the app does both. They come
+to the same money — use whichever matches how your payslip is laid out:
+
+```
+METHOD 1  the whole shift at the bank holiday rate
+BH   Bank holiday        4 h    own rate, x2      4 x £26.82 = £107.28
+
+METHOD 2  the hours in basic, the enhancement on its own line
+N    Night shift         4 h    basic             4 x £13.41 =  £53.64
+BHT  Bank holiday hours  4 h    top-up only, x2   4 x £13.41 =  £53.64
+                                                              ─────────
+                                                                £107.28
+```
+
+**Top-up only** is what makes method 2 work. If a bank holiday falls part-way
+through a night shift, the shift is already paying basic for those hours; the
+enhancement covers a subset of the same hours and appears as its own payslip
+line. Entering it as an ordinary shift would count those hours twice. A
+twelve-hour night shift with four qualifying hours is two entries:
 
 ```
 N    Night shift          12 h     basic on all twelve
@@ -113,7 +134,7 @@ Defaults are placeholders — set your own rates on the Setup tab first.
 | --- | --- |
 | Basic pay | worked hours × basic rate |
 | Holiday pay | holiday hours × holiday rate |
-| Uplift lines | uplift hours × extra per hour, shown on their own line |
+| Uplift lines | uplift hours × extra per hour (or × basic), on their own line |
 | Tax | monthly free pay from the tax code, then 20/40/45% (Scottish bands optional) |
 | National Insurance | 8% between the primary threshold and the upper limit, 2% above |
 | Pension | percentage of qualifying earnings; relief at source means you pay 80% |
