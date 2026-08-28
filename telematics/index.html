@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0E13">
+<meta name="description" content="Real-time driving telematics: speeding, braking and cornering scored from your phone's own sensors.">
+<title>Traction Circle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="css/app.css"><!--BUILD:CSS-->
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="mark">&#9678;</span> Traction Circle</div>
+    <div class="spacer"></div>
+    <div class="status-dot" id="statusDot">Idle</div>
+  </header>
+
+  <main>
+    <!-- ================= HOME ================= -->
+    <section class="screen is-active" id="screen-home">
+      <div class="stack">
+        <div class="card">
+          <h1 style="font-family:var(--font-display);font-size:27px;letter-spacing:.01em;margin-bottom:6px">
+            Score your driving the way an insurer would
+          </h1>
+          <p class="lede">
+            Your phone already has the sensors a telematics box uses. This reads them
+            live &mdash; GPS for speed and position, the accelerometer and gyroscope for
+            forces &mdash; and scores speeding, braking, acceleration and cornering on
+            every trip. Nothing is uploaded; the data stays on this device.
+          </p>
+          <div class="btn-row" style="margin-top:16px">
+            <button class="btn btn-primary btn-lg" id="btnStart">Start tracking a drive</button>
+          </div>
+          <div class="btn-row" style="margin-top:9px">
+            <button class="btn" id="btnDemoHome">Try a demo drive instead</button>
+            <button class="btn" id="btnCheck">Check my sensors</button>
+          </div>
+        </div>
+
+        <div class="card hidden" id="cardRolling">
+          <div class="card-head"><span class="card-title">Your rolling score</span>
+            <span class="card-title" id="rollingCount"></span></div>
+          <div class="scorehead">
+            <div class="ring-lg"><canvas id="rollRing"></canvas>
+              <div class="num"><span id="rollScore">--</span><em>overall</em></div>
+            </div>
+            <div>
+              <span class="band" id="rollBand">&mdash;</span>
+              <p class="fine" style="margin-top:8px" id="rollSub"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">How it scores</span></div>
+          <p class="fine" style="margin-bottom:10px">
+            Events are counted per 100&nbsp;km and weighted by severity, so a long
+            motorway run is not flattered and a short trip to the shops is not punished.
+            Each measure decays smoothly &mdash; one bad moment costs you, it does not
+            wipe you out.
+          </p>
+          <div class="comps" id="weightList"></div>
+        </div>
+
+        <div class="note warn" id="honestNote">
+          <strong>What this is not.</strong> A browser tab cannot track you in the
+          background &mdash; the screen has to stay on and this page has to stay open, so
+          it will not silently log every journey the way an insurer's app does. It also
+          has no map-matched speed limit database, so you set the limit yourself as you
+          drive. Treat the score as a mirror of your own driving, not as anything an
+          insurer would accept.
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= DRIVE ================= -->
+    <section class="screen" id="screen-drive">
+      <div class="stack">
+        <div class="hud-top">
+          <div class="hud-meta">
+            <span>TIME <b id="hudTime">0:00</b></span>
+            <span>DIST <b id="hudDist">0.0</b></span>
+            <span>GPS <b id="hudAcc">&mdash;</b></span>
+          </div>
+          <span class="status-dot" id="hudStatus">Waiting</span>
+        </div>
+
+        <div class="card" style="padding:14px 16px 18px">
+          <div class="speedwrap">
+            <div>
+              <div class="speed-readout tnum" id="hudSpeed">0</div>
+              <div class="speed-unit" id="hudSpeedUnit">MPH</div>
+            </div>
+            <div class="limit-sign is-unset" id="hudLimit">SET</div>
+          </div>
+        </div>
+
+        <div class="hud-grid">
+          <div class="card" style="padding:12px">
+            <div class="gmeter-box">
+              <canvas id="gMeter"></canvas>
+            </div>
+          </div>
+          <div class="stack" style="gap:10px">
+            <div class="card" style="padding:12px">
+              <div class="livescore">
+                <div class="ring"><canvas id="liveRing"></canvas><span id="liveScore">--</span></div>
+                <div>
+                  <div class="tile-label">Live score</div>
+                  <div class="fine" id="liveBand" style="margin-top:2px">Gathering data</div>
+                </div>
+              </div>
+            </div>
+            <div class="tiles">
+              <div class="tile is-brake"><div class="tile-label">Braking</div><div class="tile-value" id="cntBrake">0</div></div>
+              <div class="tile is-accel"><div class="tile-label">Accel</div><div class="tile-value" id="cntAccel">0</div></div>
+              <div class="tile is-corner"><div class="tile-label">Corner</div><div class="tile-value" id="cntCorner">0</div></div>
+              <div class="tile is-speed"><div class="tile-label">Speeding</div><div class="tile-value" id="cntSpeed">0</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="limitCard">
+          <div class="card-head"><span class="card-title">Speed limit here</span>
+            <span class="card-title" id="limitHint">tap as it changes</span></div>
+          <div class="limit-picker" id="limitPicker"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Live events</span>
+            <span class="card-title" id="evCount"></span></div>
+          <div class="ticker" id="ticker">
+            <div class="ticker-empty">Nothing flagged yet.</div>
+          </div>
+        </div>
+
+        <button class="btn btn-danger btn-lg" id="btnStop">End trip &amp; score it</button>
+      </div>
+    </section>
+
+    <!-- ================= SUMMARY ================= -->
+    <section class="screen" id="screen-summary">
+      <div class="stack">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title" id="sumWhen">Trip</span>
+            <span class="trip-tag hidden" id="sumDemoTag">Demo</span>
+          </div>
+          <div class="scorehead">
+            <div class="ring-lg"><canvas id="sumRing"></canvas>
+              <div class="num"><span id="sumScore">--</span><em>score</em></div>
+            </div>
+            <div>
+              <span class="band" id="sumBand">&mdash;</span>
+              <p class="fine" style="margin-top:8px" id="sumSub"></p>
+            </div>
+          </div>
+          <div class="provisional hidden" id="sumProvisional"></div>
+        </div>
+
+        <div class="stats" id="sumStats"></div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Score breakdown</span></div>
+          <div class="comps" id="sumComps"></div>
+          <div class="advice" id="sumAdvice"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Speed through the trip</span></div>
+          <div class="chart-box chart-profile">
+            <canvas id="sumProfile"></canvas>
+            <div class="tooltip" id="profileTip"></div>
+          </div>
+          <div class="chart-legend">
+            <span><i style="background:#38C6E0"></i>Speed</span>
+            <span><i style="background:#C77DFF"></i>Limit set</span>
+            <span><i style="background:#EF4F4F"></i>Braking</span>
+            <span><i style="background:#E9A13B"></i>Cornering</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Route</span>
+            <span class="card-title">events marked</span></div>
+          <div class="chart-box chart-route"><canvas id="sumRoute"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Every event</span>
+            <span class="card-title" id="sumEvCount"></span></div>
+          <div class="ticker" style="max-height:none" id="sumEvents"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Export</span></div>
+          <p class="fine" style="margin-bottom:10px">
+            Take the raw data with you. If your browser blocks the download,
+            use copy instead &mdash; you get the same content on the clipboard.
+          </p>
+          <div class="btn-row">
+            <button class="btn" id="btnGpx">GPX route</button>
+            <button class="btn" id="btnCsv">CSV events</button>
+            <button class="btn" id="btnJson">JSON</button>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn btn-ghost" id="btnCopy">Copy JSON to clipboard</button>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn" id="btnSumBack">Back</button>
+          <button class="btn btn-danger" id="btnSumDelete">Delete this trip</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= HISTORY ================= -->
+    <section class="screen" id="screen-history">
+      <div class="stack">
+        <div class="card hidden" id="histAggCard">
+          <div class="card-head"><span class="card-title">All trips combined</span>
+            <span class="card-title" id="histCount"></span></div>
+          <div class="scorehead">
+            <div class="ring-lg"><canvas id="histRing"></canvas>
+              <div class="num"><span id="histScore">--</span><em>overall</em></div>
+            </div>
+            <div>
+              <span class="band" id="histBand">&mdash;</span>
+              <p class="fine" style="margin-top:8px" id="histSub"></p>
+            </div>
+          </div>
+          <div class="comps" id="histComps" style="margin-top:16px"></div>
+        </div>
+
+        <div class="triplist" id="tripList"></div>
+
+        <div class="card" id="histTools">
+          <div class="card-head"><span class="card-title">All data</span></div>
+          <div class="btn-row">
+            <button class="btn" id="btnExportAll">Export every trip</button>
+            <button class="btn btn-danger" id="btnClearAll">Delete everything</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section class="screen" id="screen-settings">
+      <div class="stack">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Units &amp; sensitivity</span></div>
+          <div class="field">
+            <div class="field-label">Units</div>
+            <div class="seg" id="segUnits">
+              <button data-v="mph">mph</button><button data-v="kmh">km/h</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">Event sensitivity
+              <small id="sensDesc">Standard &mdash; harsh braking flags around 0.40&nbsp;g</small></div>
+            <div class="seg" id="segSens">
+              <button data-v="lenient">Lenient</button><button data-v="standard">Standard</button><button data-v="strict">Strict</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Alerts while driving</span></div>
+          <div class="field">
+            <div class="field-label">Spoken alerts <small>Only for harsh and severe events</small></div>
+            <label class="switch"><input type="checkbox" id="swVoice"><span></span></label>
+          </div>
+          <div class="field">
+            <div class="field-label">Tones <small>Short, distinct per event type</small></div>
+            <label class="switch"><input type="checkbox" id="swBeeps"><span></span></label>
+          </div>
+          <div class="field">
+            <div class="field-label">Vibration <small>Android only; iOS browsers ignore it</small></div>
+            <label class="switch"><input type="checkbox" id="swVibrate"><span></span></label>
+          </div>
+          <div class="field">
+            <div class="field-label">Keep the screen awake <small>Needed for tracking to continue</small></div>
+            <label class="switch"><input type="checkbox" id="swAwake"><span></span></label>
+          </div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn btn-ghost" id="btnTestAlert">Play a test alert</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Demo drive</span></div>
+          <p class="fine" style="margin-bottom:12px">
+            A simulated 20-minute journey &mdash; town, A-road, motorway and back &mdash;
+            run through the same fusion, detection and scoring code as a real drive.
+            The virtual phone is even mounted at a random angle, so the calibration
+            has to solve for it exactly as it would in your car.
+          </p>
+          <div class="profiles" id="profileList"></div>
+          <div class="field" style="margin-top:6px">
+            <div class="field-label">Playback speed</div>
+            <div class="seg" id="segRate">
+              <button data-v="6">6&times;</button><button data-v="12">12&times;</button>
+              <button data-v="30">30&times;</button><button data-v="0">Instant</button>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn btn-primary" id="btnDemo">Run the demo drive</button>
+            <button class="btn" id="btnDemoAll">Score all three</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Sensor diagnostics</span>
+            <button class="btn btn-ghost" id="btnDiag" style="padding:5px 11px;font-size:12.5px">Run check</button></div>
+          <div class="diag" id="diagList">
+            <div class="diag-row"><div class="k">Not checked yet</div><div class="v v-idle">Idle</div></div>
+          </div>
+          <div id="diagNotes" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">How the numbers are made</span></div>
+          <p class="fine">
+            Speed comes from a constant-acceleration Kalman filter over GPS, which also
+            yields longitudinal g without differentiating noisy samples. Gravity is
+            low-passed out of the accelerometer only while the reading is plausibly
+            static, giving a stable vertical axis. Yaw rate is the gyroscope component
+            along that axis, so lateral g &mdash; speed multiplied by yaw rate &mdash;
+            is correct no matter how the phone sits in the cradle. The forward axis is
+            solved by correlating horizontal acceleration against the GPS estimate
+            during straight-line speed changes, then high-frequency detail is blended
+            onto the GPS trend. With no gyroscope it falls back to GPS heading changes;
+            with no motion sensor at all it runs on GPS alone.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <button data-nav="home" class="is-on">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/></svg>
+        Drive
+      </button>
+      <button data-nav="history">
+        <svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-7"/></svg>
+        Trips
+      </button>
+      <button data-nav="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+        Setup
+      </button>
+    </div>
+  </nav>
+</div>
+<div class="flash" id="flash"></div>
+
+<script src="js/util.js"></script>
+<script src="js/kinematics.js"></script>
+<script src="js/events.js"></script>
+<script src="js/scoring.js"></script>
+<script src="js/trip.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/sensors.js"></script>
+<script src="js/simulate.js"></script>
+<script src="js/exporters.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+<!--BUILD:JS-->
+</body>
+</html>

@@ -1,0 +1,4146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0E13">
+<meta name="description" content="Real-time driving telematics: speeding, braking and cornering scored from your phone's own sensors.">
+<title>Traction Circle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@600;700&display=swap">
+<style>
+/* Driving telematics — instrument-cluster styling.
+   Deliberately single-theme: this is read through a windscreen mount, often at
+   night, so the dark ground is the design rather than a mode. Every colour is
+   painted explicitly so the page never borrows a host background. */
+
+:root {
+  --ground:   #0B0E13;
+  --panel:    #141A21;
+  --panel-2:  #1A222B;
+  --line:     #212B36;
+  --line-2:   #2C3844;
+  --ink:      #E9EEF4;
+  --ink-2:    #B4C1CE;
+  --muted:    #8494A5;
+  --dim:      #5A6875;
+  --accent:   #38C6E0;
+  --accent-d: #1C7C8E;
+  --good:     #3FBF7F;
+  --warn:     #E9A13B;
+  --crit:     #EF4F4F;
+  --speed:    #C77DFF;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+
+  --font-display: "Saira Condensed", "Oswald", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; text-wrap: balance; }
+
+.app {
+  max-width: 760px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- header ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ground);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.brand .mark { color: var(--accent); }
+.topbar .spacer { flex: 1; }
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.status-dot::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+.status-dot.is-live::before { background: var(--good); box-shadow: 0 0 0 3px rgba(63,191,127,0.16); }
+.status-dot.is-warn::before { background: var(--warn); }
+.status-dot.is-off::before  { background: var(--crit); }
+.status-dot.is-demo::before { background: var(--speed); }
+
+/* ---------- screens ---------- */
+main { flex: 1; padding: 16px; padding-bottom: 92px; }
+.screen { display: none; }
+.screen.is-active { display: block; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* ---------- cards ---------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.card-title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+}
+.lede { color: var(--ink-2); margin: 0; }
+.lede + .lede { margin-top: 10px; }
+.fine { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+/* ---------- buttons ---------- */
+.btn {
+  appearance: none;
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 11px 16px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
+}
+.btn:hover { background: #202A34; border-color: #3A4A58; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06222A;
+  font-weight: 600;
+}
+.btn-primary:hover { background: #4FD3EA; border-color: #4FD3EA; }
+.btn-danger { background: rgba(239,79,79,0.12); border-color: rgba(239,79,79,0.4); color: #FF9A9A; }
+.btn-danger:hover { background: rgba(239,79,79,0.2); border-color: rgba(239,79,79,0.6); }
+.btn-ghost { background: transparent; }
+.btn-lg { padding: 15px 20px; font-size: 16px; width: 100%; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-row > .btn { flex: 1 1 auto; }
+
+/* ---------- drive HUD ---------- */
+.hud-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.hud-meta {
+  display: flex;
+  gap: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.hud-meta b { color: var(--ink); font-weight: 500; }
+
+.speedwrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 4px 0 2px;
+}
+.speed-readout {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(78px, 27vw, 132px);
+  line-height: 0.86;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  transition: color 200ms ease;
+}
+.speed-readout.is-over { color: var(--crit); }
+.speed-unit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 6px;
+}
+
+/* UK-style limit roundel: instantly recognisable at a glance. */
+.limit-sign {
+  width: 66px; height: 66px;
+  border-radius: 50%;
+  background: #F2F4F6;
+  border: 7px solid #D2202A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+  color: #14181C;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.limit-sign.is-unset {
+  background: transparent;
+  border-color: var(--line-2);
+  color: var(--dim);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.hud-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+@media (max-width: 430px) { .hud-grid { grid-template-columns: 1fr; } }
+
+.gmeter-box { position: relative; aspect-ratio: 1 / 1; min-height: 190px; max-width: 300px; margin: 0 auto; }
+.gmeter-box canvas { width: 100%; height: 100%; display: block; }
+
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 9px 11px;
+}
+.tile-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tile-value {
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.12;
+}
+.tile-value small { font-size: 12px; color: var(--muted); font-family: var(--font-mono); font-weight: 400; }
+.tile.is-brake .tile-value { color: var(--crit); }
+.tile.is-accel .tile-value { color: var(--accent); }
+.tile.is-corner .tile-value { color: var(--warn); }
+.tile.is-speed .tile-value { color: var(--speed); }
+
+.livescore {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.livescore .ring { width: 66px; height: 66px; flex: 0 0 auto; position: relative; }
+.livescore .ring canvas { width: 100%; height: 100%; }
+.livescore .ring span {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 24px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* limit picker */
+.limit-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.limit-btn {
+  flex: 1 1 auto;
+  min-width: 48px;
+  padding: 9px 4px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--ink-2);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.limit-btn.is-on {
+  background: rgba(199,125,255,0.16);
+  border-color: var(--speed);
+  color: #E4C6FF;
+}
+.limit-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* event ticker */
+.ticker { display: flex; flex-direction: column; gap: 6px; max-height: 168px; overflow-y: auto; }
+.ticker-empty { color: var(--dim); font-size: 13px; font-style: italic; }
+.ev {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  border-left: 3px solid var(--line-2);
+  font-size: 13px;
+  animation: evIn 240ms ease;
+}
+@keyframes evIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ev { animation: none; } }
+.ev.t-brake { border-left-color: var(--crit); }
+.ev.t-accel { border-left-color: var(--accent); }
+.ev.t-corner { border-left-color: var(--warn); }
+.ev.t-speeding { border-left-color: var(--speed); }
+.ev .ev-name { font-weight: 500; flex: 1; }
+.ev .ev-val { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ev .ev-time { font-family: var(--font-mono); font-size: 11px; color: var(--dim); }
+.sev-tag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+.sev-mild { background: rgba(132,148,165,0.18); color: var(--muted); }
+.sev-harsh { background: rgba(233,161,59,0.18); color: var(--warn); }
+.sev-severe { background: rgba(239,79,79,0.2); color: #FF8B8B; }
+
+/* flash overlay for real-time alerts */
+.flash {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 50;
+  transition: opacity 160ms ease;
+}
+.flash.is-on { opacity: 1; }
+.flash.f-warn { box-shadow: inset 0 0 0 5px var(--warn), inset 0 0 60px rgba(233,161,59,0.28); }
+.flash.f-crit { box-shadow: inset 0 0 0 5px var(--crit), inset 0 0 60px rgba(239,79,79,0.32); }
+@media (prefers-reduced-motion: reduce) { .flash { transition: none; } }
+
+/* ---------- score display ---------- */
+.scorehead { display: flex; align-items: center; gap: 18px; }
+.scorehead .ring-lg { width: 118px; height: 118px; position: relative; flex: 0 0 auto; }
+.scorehead .ring-lg canvas { width: 100%; height: 100%; }
+.scorehead .ring-lg .num {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-size: 46px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.scorehead .ring-lg .num em {
+  font-style: normal; font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase;
+  margin-top: 3px;
+}
+.band {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+.band.tone-good { background: rgba(63,191,127,0.14); color: var(--good); }
+.band.tone-warn { background: rgba(233,161,59,0.14); color: var(--warn); }
+.band.tone-crit { background: rgba(239,79,79,0.15); color: #FF8B8B; }
+
+.provisional {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--warn);
+  background: rgba(233,161,59,0.09);
+  border: 1px solid rgba(233,161,59,0.26);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+
+/* component bars */
+.comps { display: flex; flex-direction: column; gap: 11px; }
+.comp { display: grid; grid-template-columns: 96px 1fr 42px; gap: 10px; align-items: center; }
+.comp-name { font-size: 13px; color: var(--ink-2); }
+.comp-name small { display: block; font-family: var(--font-mono); font-size: 9.5px; color: var(--dim); }
+.comp-track { height: 7px; background: var(--panel-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+.comp-fill { height: 100%; border-radius: 999px; transition: width 420ms cubic-bezier(.2,.7,.3,1); }
+.comp-fill.tone-good { background: var(--good); }
+.comp-fill.tone-warn { background: var(--warn); }
+.comp-fill.tone-crit { background: var(--crit); }
+.comp-score { font-family: var(--font-mono); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.comp.is-na .comp-track, .comp.is-na .comp-score { opacity: 0.35; }
+.comp-na { font-family: var(--font-mono); font-size: 10px; color: var(--dim); text-align: right; }
+
+.advice {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: rgba(56,198,224,0.07);
+  border: 1px solid rgba(56,198,224,0.22);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+/* stat strip */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 480px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 11px; }
+.stat-label { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.stat-value { font-family: var(--font-display); font-size: 23px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat-value small { font-size: 11px; color: var(--muted); font-family: var(--font-mono); font-weight: 400; }
+
+/* charts */
+.chart-box { position: relative; width: 100%; }
+.chart-box canvas { width: 100%; height: 100%; display: block; }
+.chart-route { height: 210px; }
+.chart-profile { height: 168px; }
+.chart-legend {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  margin-top: 10px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--muted);
+}
+.chart-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #0F151C;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 6px 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 100ms ease;
+  z-index: 5;
+}
+.tooltip.is-on { opacity: 1; }
+
+/* ---------- lists ---------- */
+.triplist { display: flex; flex-direction: column; gap: 8px; }
+.trip-row {
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  color: inherit;
+}
+.trip-row:hover { border-color: var(--line-2); background: var(--panel-2); }
+.trip-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.trip-score {
+  font-family: var(--font-display);
+  font-size: 26px; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.trip-score.tone-good { color: var(--good); }
+.trip-score.tone-warn { color: var(--warn); }
+.trip-score.tone-crit { color: var(--crit); }
+.trip-main { min-width: 0; }
+.trip-when { font-size: 13.5px; font-weight: 500; }
+.trip-sub { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.trip-tag {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--speed);
+  border: 1px solid rgba(199,125,255,0.35); border-radius: 3px; padding: 1px 4px;
+}
+.empty { text-align: center; padding: 34px 16px; color: var(--dim); }
+.empty p { margin: 6px 0 0; font-size: 13.5px; }
+
+/* ---------- settings ---------- */
+.field { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.field:last-child { border-bottom: 0; }
+.field-label { font-size: 14px; }
+.field-label small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: var(--r-sm); overflow: hidden; flex: 0 0 auto; }
+.seg button {
+  appearance: none; border: 0; background: transparent; color: var(--muted);
+  font-family: var(--font-body); font-size: 12.5px; padding: 7px 12px; cursor: pointer;
+}
+.seg button.is-on { background: var(--accent); color: #06222A; font-weight: 600; }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.switch { position: relative; width: 44px; height: 25px; flex: 0 0 auto; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch span {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: var(--panel-2); border: 1px solid var(--line-2);
+  transition: background 150ms ease, border-color 150ms ease;
+  pointer-events: none;
+}
+.switch span::after {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--muted);
+  transition: transform 150ms ease, background 150ms ease;
+}
+.switch input:checked + span { background: rgba(56,198,224,0.22); border-color: var(--accent); }
+.switch input:checked + span::after { transform: translateX(19px); background: var(--accent); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- diagnostics ---------- */
+.diag { display: flex; flex-direction: column; gap: 2px; }
+.diag-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--line);
+  font-size: 13.5px; align-items: center;
+}
+.diag-row:last-child { border-bottom: 0; }
+.diag-row .k { color: var(--ink-2); }
+.diag-row .k small { display: block; color: var(--muted); font-size: 12px; }
+.diag-row .v { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.v-ok { color: var(--good); }
+.v-no { color: var(--crit); }
+.v-warn { color: var(--warn); }
+.v-idle { color: var(--dim); }
+
+.note {
+  border-left: 3px solid var(--accent);
+  background: rgba(56,198,224,0.05);
+  padding: 11px 13px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.note.warn { border-left-color: var(--warn); background: rgba(233,161,59,0.06); }
+.note strong { color: var(--ink); font-weight: 600; }
+
+/* ---------- profile chooser ---------- */
+.profiles { display: flex; flex-direction: column; gap: 8px; }
+.profile-btn {
+  display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center;
+  padding: 12px; border-radius: var(--r-md);
+  border: 1px solid var(--line-2); background: var(--panel-2);
+  cursor: pointer; text-align: left; color: inherit; font-family: inherit; width: 100%;
+}
+.profile-btn:hover { border-color: var(--accent-d); }
+.profile-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.profile-btn.is-on { border-color: var(--accent); background: rgba(56,198,224,0.08); }
+.profile-key {
+  font-family: var(--font-display); font-size: 13px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 5px 9px; border-radius: var(--r-sm);
+  background: var(--panel); border: 1px solid var(--line-2);
+}
+.profile-btn .t { font-size: 14px; font-weight: 500; }
+.profile-btn .d { font-size: 12.5px; color: var(--muted); }
+
+/* ---------- bottom nav ---------- */
+.nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 30;
+  display: flex;
+  background: rgba(11,14,19,0.94);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.nav-inner { max-width: 760px; margin: 0 auto; display: flex; width: 100%; }
+.nav button {
+  flex: 1;
+  appearance: none; border: 0; background: transparent;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 11px 4px 13px;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  border-top: 2px solid transparent;
+  margin-top: -1px;
+}
+.nav button svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+.nav button.is-on { color: var(--accent); border-top-color: var(--accent); }
+.nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+/* ---------- misc ---------- */
+.hidden { display: none !important; }
+.mono { font-family: var(--font-mono); }
+.tnum { font-variant-numeric: tabular-nums; }
+.scroll-x { overflow-x: auto; }
+hr.sep { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+a { color: var(--accent); }
+
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="mark">&#9678;</span> Traction Circle</div>
+    <div class="spacer"></div>
+    <div class="status-dot" id="statusDot">Idle</div>
+  </header>
+
+  <main>
+    <!-- ================= HOME ================= -->
+    <section class="screen is-active" id="screen-home">
+      <div class="stack">
+        <div class="card">
+          <h1 style="font-family:var(--font-display);font-size:27px;letter-spacing:.01em;margin-bottom:6px">
+            Score your driving the way an insurer would
+          </h1>
+          <p class="lede">
+            Your phone already has the sensors a telematics box uses. This reads them
+            live &mdash; GPS for speed and position, the accelerometer and gyroscope for
+            forces &mdash; and scores speeding, braking, acceleration and cornering on
+            every trip. Nothing is uploaded; the data stays on this device.
+          </p>
+          <div class="btn-row" style="margin-top:16px">
+            <button class="btn btn-primary btn-lg" id="btnStart">Start tracking a drive</button>
+          </div>
+          <div class="btn-row" style="margin-top:9px">
+            <button class="btn" id="btnDemoHome">Try a demo drive instead</button>
+            <button class="btn" id="btnCheck">Check my sensors</button>
+          </div>
+        </div>
+
+        <div class="card hidden" id="cardRolling">
+          <div class="card-head"><span class="card-title">Your rolling score</span>
+            <span class="card-title" id="rollingCount"></span></div>
+          <div class="scorehead">
+            <div class="ring-lg"><canvas id="rollRing"></canvas>
+              <div class="num"><span id="rollScore">--</span><em>overall</em></div>
+            </div>
+            <div>
+              <span class="band" id="rollBand">&mdash;</span>
+              <p class="fine" style="margin-top:8px" id="rollSub"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">How it scores</span></div>
+          <p class="fine" style="margin-bottom:10px">
+            Events are counted per 100&nbsp;km and weighted by severity, so a long
+            motorway run is not flattered and a short trip to the shops is not punished.
+            Each measure decays smoothly &mdash; one bad moment costs you, it does not
+            wipe you out.
+          </p>
+          <div class="comps" id="weightList"></div>
+        </div>
+
+        <div class="note warn" id="honestNote">
+          <strong>What this is not.</strong> A browser tab cannot track you in the
+          background &mdash; the screen has to stay on and this page has to stay open, so
+          it will not silently log every journey the way an insurer's app does. It also
+          has no map-matched speed limit database, so you set the limit yourself as you
+          drive. Treat the score as a mirror of your own driving, not as anything an
+          insurer would accept.
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= DRIVE ================= -->
+    <section class="screen" id="screen-drive">
+      <div class="stack">
+        <div class="hud-top">
+          <div class="hud-meta">
+            <span>TIME <b id="hudTime">0:00</b></span>
+            <span>DIST <b id="hudDist">0.0</b></span>
+            <span>GPS <b id="hudAcc">&mdash;</b></span>
+          </div>
+          <span class="status-dot" id="hudStatus">Waiting</span>
+        </div>
+
+        <div class="card" style="padding:14px 16px 18px">
+          <div class="speedwrap">
+            <div>
+              <div class="speed-readout tnum" id="hudSpeed">0</div>
+              <div class="speed-unit" id="hudSpeedUnit">MPH</div>
+            </div>
+            <div class="limit-sign is-unset" id="hudLimit">SET</div>
+          </div>
+        </div>
+
+        <div class="hud-grid">
+          <div class="card" style="padding:12px">
+            <div class="gmeter-box">
+              <canvas id="gMeter"></canvas>
+            </div>
+          </div>
+          <div class="stack" style="gap:10px">
+            <div class="card" style="padding:12px">
+              <div class="livescore">
+                <div class="ring"><canvas id="liveRing"></canvas><span id="liveScore">--</span></div>
+                <div>
+                  <div class="tile-label">Live score</div>
+                  <div class="fine" id="liveBand" style="margin-top:2px">Gathering data</div>
+                </div>
+              </div>
+            </div>
+            <div class="tiles">
+              <div class="tile is-brake"><div class="tile-label">Braking</div><div class="tile-value" id="cntBrake">0</div></div>
+              <div class="tile is-accel"><div class="tile-label">Accel</div><div class="tile-value" id="cntAccel">0</div></div>
+              <div class="tile is-corner"><div class="tile-label">Corner</div><div class="tile-value" id="cntCorner">0</div></div>
+              <div class="tile is-speed"><div class="tile-label">Speeding</div><div class="tile-value" id="cntSpeed">0</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="limitCard">
+          <div class="card-head"><span class="card-title">Speed limit here</span>
+            <span class="card-title" id="limitHint">tap as it changes</span></div>
+          <div class="limit-picker" id="limitPicker"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Live events</span>
+            <span class="card-title" id="evCount"></span></div>
+          <div class="ticker" id="ticker">
+            <div class="ticker-empty">Nothing flagged yet.</div>
+          </div>
+        </div>
+
+        <button class="btn btn-danger btn-lg" id="btnStop">End trip &amp; score it</button>
+      </div>
+    </section>
+
+    <!-- ================= SUMMARY ================= -->
+    <section class="screen" id="screen-summary">
+      <div class="stack">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title" id="sumWhen">Trip</span>
+            <span class="trip-tag hidden" id="sumDemoTag">Demo</span>
+          </div>
+          <div class="scorehead">
+            <div class="ring-lg"><canvas id="sumRing"></canvas>
+              <div class="num"><span id="sumScore">--</span><em>score</em></div>
+            </div>
+            <div>
+              <span class="band" id="sumBand">&mdash;</span>
+              <p class="fine" style="margin-top:8px" id="sumSub"></p>
+            </div>
+          </div>
+          <div class="provisional hidden" id="sumProvisional"></div>
+        </div>
+
+        <div class="stats" id="sumStats"></div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Score breakdown</span></div>
+          <div class="comps" id="sumComps"></div>
+          <div class="advice" id="sumAdvice"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Speed through the trip</span></div>
+          <div class="chart-box chart-profile">
+            <canvas id="sumProfile"></canvas>
+            <div class="tooltip" id="profileTip"></div>
+          </div>
+          <div class="chart-legend">
+            <span><i style="background:#38C6E0"></i>Speed</span>
+            <span><i style="background:#C77DFF"></i>Limit set</span>
+            <span><i style="background:#EF4F4F"></i>Braking</span>
+            <span><i style="background:#E9A13B"></i>Cornering</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Route</span>
+            <span class="card-title">events marked</span></div>
+          <div class="chart-box chart-route"><canvas id="sumRoute"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Every event</span>
+            <span class="card-title" id="sumEvCount"></span></div>
+          <div class="ticker" style="max-height:none" id="sumEvents"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Export</span></div>
+          <p class="fine" style="margin-bottom:10px">
+            Take the raw data with you. If your browser blocks the download,
+            use copy instead &mdash; you get the same content on the clipboard.
+          </p>
+          <div class="btn-row">
+            <button class="btn" id="btnGpx">GPX route</button>
+            <button class="btn" id="btnCsv">CSV events</button>
+            <button class="btn" id="btnJson">JSON</button>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn btn-ghost" id="btnCopy">Copy JSON to clipboard</button>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn" id="btnSumBack">Back</button>
+          <button class="btn btn-danger" id="btnSumDelete">Delete this trip</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= HISTORY ================= -->
+    <section class="screen" id="screen-history">
+      <div class="stack">
+        <div class="card hidden" id="histAggCard">
+          <div class="card-head"><span class="card-title">All trips combined</span>
+            <span class="card-title" id="histCount"></span></div>
+          <div class="scorehead">
+            <div class="ring-lg"><canvas id="histRing"></canvas>
+              <div class="num"><span id="histScore">--</span><em>overall</em></div>
+            </div>
+            <div>
+              <span class="band" id="histBand">&mdash;</span>
+              <p class="fine" style="margin-top:8px" id="histSub"></p>
+            </div>
+          </div>
+          <div class="comps" id="histComps" style="margin-top:16px"></div>
+        </div>
+
+        <div class="triplist" id="tripList"></div>
+
+        <div class="card" id="histTools">
+          <div class="card-head"><span class="card-title">All data</span></div>
+          <div class="btn-row">
+            <button class="btn" id="btnExportAll">Export every trip</button>
+            <button class="btn btn-danger" id="btnClearAll">Delete everything</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section class="screen" id="screen-settings">
+      <div class="stack">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Units &amp; sensitivity</span></div>
+          <div class="field">
+            <div class="field-label">Units</div>
+            <div class="seg" id="segUnits">
+              <button data-v="mph">mph</button><button data-v="kmh">km/h</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">Event sensitivity
+              <small id="sensDesc">Standard &mdash; harsh braking flags around 0.40&nbsp;g</small></div>
+            <div class="seg" id="segSens">
+              <button data-v="lenient">Lenient</button><button data-v="standard">Standard</button><button data-v="strict">Strict</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Alerts while driving</span></div>
+          <div class="field">
+            <div class="field-label">Spoken alerts <small>Only for harsh and severe events</small></div>
+            <label class="switch"><input type="checkbox" id="swVoice"><span></span></label>
+          </div>
+          <div class="field">
+            <div class="field-label">Tones <small>Short, distinct per event type</small></div>
+            <label class="switch"><input type="checkbox" id="swBeeps"><span></span></label>
+          </div>
+          <div class="field">
+            <div class="field-label">Vibration <small>Android only; iOS browsers ignore it</small></div>
+            <label class="switch"><input type="checkbox" id="swVibrate"><span></span></label>
+          </div>
+          <div class="field">
+            <div class="field-label">Keep the screen awake <small>Needed for tracking to continue</small></div>
+            <label class="switch"><input type="checkbox" id="swAwake"><span></span></label>
+          </div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn btn-ghost" id="btnTestAlert">Play a test alert</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Demo drive</span></div>
+          <p class="fine" style="margin-bottom:12px">
+            A simulated 20-minute journey &mdash; town, A-road, motorway and back &mdash;
+            run through the same fusion, detection and scoring code as a real drive.
+            The virtual phone is even mounted at a random angle, so the calibration
+            has to solve for it exactly as it would in your car.
+          </p>
+          <div class="profiles" id="profileList"></div>
+          <div class="field" style="margin-top:6px">
+            <div class="field-label">Playback speed</div>
+            <div class="seg" id="segRate">
+              <button data-v="6">6&times;</button><button data-v="12">12&times;</button>
+              <button data-v="30">30&times;</button><button data-v="0">Instant</button>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn btn-primary" id="btnDemo">Run the demo drive</button>
+            <button class="btn" id="btnDemoAll">Score all three</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Sensor diagnostics</span>
+            <button class="btn btn-ghost" id="btnDiag" style="padding:5px 11px;font-size:12.5px">Run check</button></div>
+          <div class="diag" id="diagList">
+            <div class="diag-row"><div class="k">Not checked yet</div><div class="v v-idle">Idle</div></div>
+          </div>
+          <div id="diagNotes" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">How the numbers are made</span></div>
+          <p class="fine">
+            Speed comes from a constant-acceleration Kalman filter over GPS, which also
+            yields longitudinal g without differentiating noisy samples. Gravity is
+            low-passed out of the accelerometer only while the reading is plausibly
+            static, giving a stable vertical axis. Yaw rate is the gyroscope component
+            along that axis, so lateral g &mdash; speed multiplied by yaw rate &mdash;
+            is correct no matter how the phone sits in the cradle. The forward axis is
+            solved by correlating horizontal acceleration against the GPS estimate
+            during straight-line speed changes, then high-frequency detail is blended
+            onto the GPS trend. With no gyroscope it falls back to GPS heading changes;
+            with no motion sensor at all it runs on GPS alone.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <button data-nav="home" class="is-on">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/></svg>
+        Drive
+      </button>
+      <button data-nav="history">
+        <svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-7"/></svg>
+        Trips
+      </button>
+      <button data-nav="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+        Setup
+      </button>
+    </div>
+  </nav>
+</div>
+<div class="flash" id="flash"></div>
+<script>
+/* ===== util.js ===== */
+/* Shared math + formatting helpers. Global namespace, no modules, so the
+   app also runs from a plain file:// open for the demo mode. */
+(function (TL) {
+  'use strict';
+
+  var G = 9.80665;                 // m/s^2
+  var MPS_TO_MPH = 2.2369362920544;
+  var MPS_TO_KMH = 3.6;
+  var EARTH_R = 6371000;           // m
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function toRad(d) { return d * Math.PI / 180; }
+  function toDeg(r) { return r * 180 / Math.PI; }
+
+  /* Great-circle distance in metres. */
+  function haversine(lat1, lon1, lat2, lon2) {
+    var dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * EARTH_R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  /* Initial bearing lat1,lon1 -> lat2,lon2, degrees clockwise from north. */
+  function bearing(lat1, lon1, lat2, lon2) {
+    var y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+    var x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+            Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  /* Shortest signed difference a-b in degrees, in (-180, 180]. */
+  function angleDiff(a, b) {
+    var d = (a - b + 540) % 360 - 180;
+    return d;
+  }
+
+  /* Offset a lat/lon by a local east/north displacement in metres. */
+  function offsetLatLon(lat, lon, east, north) {
+    return {
+      lat: lat + toDeg(north / EARTH_R),
+      lon: lon + toDeg(east / (EARTH_R * Math.cos(toRad(lat))))
+    };
+  }
+
+  function vLen(v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); }
+  function vDot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function vCross(a, b) {
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  }
+  function vSub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+  function vScale(a, s) { return [a[0] * s, a[1] * s, a[2] * s]; }
+  function vNorm(a) {
+    var l = vLen(a);
+    return l > 1e-9 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0];
+  }
+  /* Component of a perpendicular to unit vector u. */
+  function vReject(a, u) { return vSub(a, vScale(u, vDot(a, u))); }
+
+  /* Exponential moving average coefficient for a time constant, given dt. */
+  function emaAlpha(dt, tau) {
+    if (!(tau > 0)) return 1;
+    return 1 - Math.exp(-dt / tau);
+  }
+
+  function speedIn(mps, units) {
+    return mps * (units === 'kmh' ? MPS_TO_KMH : MPS_TO_MPH);
+  }
+  function speedFrom(val, units) {
+    return val / (units === 'kmh' ? MPS_TO_KMH : MPS_TO_MPH);
+  }
+  function speedUnit(units) { return units === 'kmh' ? 'km/h' : 'mph'; }
+
+  function fmtSpeed(mps, units, dp) {
+    var v = speedIn(mps || 0, units);
+    return v.toFixed(dp == null ? 0 : dp);
+  }
+  function fmtDist(m, units) {
+    if (units === 'kmh') {
+      return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
+    }
+    var mi = m / 1609.344;
+    return mi < 0.1 ? Math.round(m * 3.28084) + ' ft' : mi.toFixed(mi < 10 ? 2 : 1) + ' mi';
+  }
+  function distUnit(units) { return units === 'kmh' ? 'km' : 'mi'; }
+  function distIn(m, units) { return units === 'kmh' ? m / 1000 : m / 1609.344; }
+
+  function fmtDuration(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+    function p(n) { return n < 10 ? '0' + n : '' + n; }
+    return h > 0 ? h + ':' + p(m) + ':' + p(ss) : m + ':' + p(ss);
+  }
+  function fmtClock(ts) {
+    var d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  function fmtG(a) { return (Math.abs(a) / G).toFixed(2); }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  /* Seeded PRNG so a demo profile replays identically when you want it to. */
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  TL.util = {
+    G: G, MPS_TO_MPH: MPS_TO_MPH, MPS_TO_KMH: MPS_TO_KMH,
+    clamp: clamp, toRad: toRad, toDeg: toDeg,
+    haversine: haversine, bearing: bearing, angleDiff: angleDiff, offsetLatLon: offsetLatLon,
+    vLen: vLen, vDot: vDot, vCross: vCross, vSub: vSub, vScale: vScale, vNorm: vNorm, vReject: vReject,
+    emaAlpha: emaAlpha,
+    speedIn: speedIn, speedFrom: speedFrom, speedUnit: speedUnit, fmtSpeed: fmtSpeed,
+    fmtDist: fmtDist, distUnit: distUnit, distIn: distIn,
+    fmtDuration: fmtDuration, fmtClock: fmtClock, fmtDate: fmtDate, fmtG: fmtG,
+    uid: uid, mulberry32: mulberry32
+  };
+})(window.TL = window.TL || {});
+
+/* ===== kinematics.js ===== */
+/* Kinematics: turns raw GPS + IMU samples into vehicle-frame motion.
+ *
+ * The hard problem in phone telematics is that the accelerometer reports in the
+ * DEVICE frame (which depends on how the phone happens to be lying) while the
+ * scoring needs the VEHICLE frame (forward / lateral). Three tricks are used:
+ *
+ *  1. Gravity, low-pass filtered out of accelerationIncludingGravity, gives the
+ *     vertical axis "u" for free, whatever the mounting angle.
+ *  2. Yaw rate is the component of the gyro vector along u. Rotation about the
+ *     vertical axis is yaw regardless of how the phone is rotated, so lateral
+ *     acceleration = v * yawRate needs no calibration at all.
+ *  3. The forward axis is solved for by correlating the horizontal accelerometer
+ *     vector against GPS-derived longitudinal acceleration during straight-line
+ *     speed changes. Once that correlation is confident, high-rate accelerometer
+ *     detail is blended onto the low-rate GPS trend with a complementary filter.
+ *
+ * If there is no motion sensor at all, everything still works from GPS alone
+ * (speed differentiation + heading rate), just with coarser event timing.
+ */
+(function (TL) {
+  'use strict';
+  var U = TL.util, G = U.G;
+
+  function Kinematics(opts) {
+    opts = opts || {};
+    this.reset();
+  }
+
+  Kinematics.prototype.reset = function () {
+    // Constant-acceleration Kalman filter on speed: x = [v, a]
+    this.x = [0, 0];
+    this.P = [[25, 0], [0, 9]];
+    this.qJerk = 1.6;            // process noise, m/s^3
+    this.lastPredictT = null;
+
+    this.pos = null;             // last accepted fix
+    this.prevPos = null;
+    this.heading = null;         // deg
+    this.headingT = null;
+    this.yawRateGps = 0;         // rad/s, +ve = turning left
+    this.accuracy = null;
+    this.gpsAgeT = null;
+    this.fixCount = 0;
+
+    // IMU
+    this.gravity = null;         // [x,y,z] device frame
+    this.gravSamples = 0;
+    this.omega = [0, 0, 0];      // rad/s device frame
+    this.gyroBias = [0, 0, 0];
+    this.gyroBiasN = 0;
+    this.hasMotion = false;
+    this.hasGyro = false;
+    this.yawSignAcc = 0;
+    this.yawSign = 1;
+    this.motionT = null;
+    this.motionRate = 0;
+
+    // Forward-axis solver
+    this.fwdAcc = [0, 0, 0];     // correlation accumulator
+    this.fwdMag = 0;             // normalisation for confidence
+    this.forward = null;         // unit vector, device frame
+    this.calConf = 0;            // 0..1
+
+    // Fused outputs
+    this.aLong = 0;              // +ve = accelerating, m/s^2
+    this.aLat = 0;               // +ve = accelerating to vehicle's right
+    this.yawRate = 0;            // rad/s, +ve = left
+    this.jerk = 0;               // m/s^3
+    this.aLongGps = 0;
+    this.aLongImu = 0;
+    this.aLongImuLp = 0;
+    this.aLongGpsLp = 0;
+    this.aLatImu = 0;
+    this.prevALong = 0;
+    this.distance = 0;
+    this.tickT = null;
+  };
+
+  /* --- 2x2 Kalman helpers ------------------------------------------------ */
+  Kinematics.prototype._predict = function (dt) {
+    if (!(dt > 0)) return;
+    dt = Math.min(dt, 2.5);
+    var x = this.x, P = this.P;
+    x[0] = x[0] + x[1] * dt;
+    // F = [[1,dt],[0,1]] -> P = F P F' + Q
+    var p00 = P[0][0] + dt * (P[1][0] + P[0][1]) + dt * dt * P[1][1];
+    var p01 = P[0][1] + dt * P[1][1];
+    var p10 = P[1][0] + dt * P[1][1];
+    var p11 = P[1][1];
+    var q = this.qJerk * this.qJerk;
+    P[0][0] = p00 + q * dt * dt * dt * dt / 4;
+    P[0][1] = p01 + q * dt * dt * dt / 2;
+    P[1][0] = p10 + q * dt * dt * dt / 2;
+    P[1][1] = p11 + q * dt * dt;
+    if (x[0] < 0) { x[0] = 0; if (x[1] < 0) x[1] = 0; }
+  };
+
+  Kinematics.prototype._updateSpeed = function (z, sigma) {
+    var P = this.P, x = this.x;
+    var R = sigma * sigma;
+    var S = P[0][0] + R;
+    var k0 = P[0][0] / S, k1 = P[1][0] / S;
+    var y = z - x[0];
+    x[0] += k0 * y;
+    x[1] += k1 * y;
+    var p00 = P[0][0], p01 = P[0][1];
+    P[0][0] = (1 - k0) * p00;
+    P[0][1] = (1 - k0) * p01;
+    P[1][0] = P[1][0] - k1 * p00;
+    P[1][1] = P[1][1] - k1 * p01;
+    if (x[0] < 0) x[0] = 0;
+  };
+
+  /* --- GPS --------------------------------------------------------------- */
+  /* p = {t, lat, lon, speed|null (m/s), heading|null (deg), accuracy (m),
+          speedAccuracy|null} */
+  Kinematics.prototype.pushPosition = function (p) {
+    var t = p.t / 1000;
+    if (this.lastPredictT != null) this._predict(t - this.lastPredictT);
+    this.lastPredictT = t;
+
+    var acc = (p.accuracy == null || !isFinite(p.accuracy)) ? 15 : p.accuracy;
+    this.accuracy = acc;
+
+    // Speed: prefer the receiver's Doppler speed, else differentiate position.
+    var z = null, sigma = null;
+    if (p.speed != null && isFinite(p.speed) && p.speed >= 0) {
+      z = p.speed;
+      sigma = (p.speedAccuracy != null && isFinite(p.speedAccuracy))
+        ? Math.max(0.25, p.speedAccuracy) : Math.max(0.4, acc / 12);
+    } else if (this.pos) {
+      var dtp = t - this.pos.t / 1000;
+      if (dtp > 0.2) {
+        var d = U.haversine(this.pos.lat, this.pos.lon, p.lat, p.lon);
+        z = d / dtp;
+        // Position differencing inherits the fix noise on both ends.
+        sigma = Math.max(0.8, (acc + (this.pos.accuracy || acc)) / dtp / 2);
+      }
+    }
+    if (z != null) this._updateSpeed(z, sigma);
+
+    // Distance travelled, gated on fix quality so a jittering stationary fix
+    // does not accumulate phantom miles.
+    if (this.pos) {
+      var dm = U.haversine(this.pos.lat, this.pos.lon, p.lat, p.lon);
+      var dts = t - this.pos.t / 1000;
+      if (dm > Math.max(2, acc * 0.5) && dts > 0 && dm / dts < 90) this.distance += dm;
+    }
+
+    // Heading: receiver value when moving, else bearing between fixes.
+    var newHeading = null;
+    if (p.heading != null && isFinite(p.heading) && this.x[0] > 2.0) {
+      newHeading = p.heading;
+    } else if (this.pos) {
+      var dd = U.haversine(this.pos.lat, this.pos.lon, p.lat, p.lon);
+      if (dd > Math.max(4, acc)) newHeading = U.bearing(this.pos.lat, this.pos.lon, p.lat, p.lon);
+    }
+    if (newHeading != null) {
+      if (this.heading != null && this.headingT != null) {
+        var dth = t - this.headingT;
+        if (dth > 0.15 && dth < 4 && this.x[0] > 2.0) {
+          // +ve yaw rate = turning left = decreasing compass bearing.
+          var dHead = U.angleDiff(newHeading, this.heading);
+          var yr = -U.toRad(dHead) / dth;
+          if (Math.abs(yr) < 2.0) this.yawRateGps = yr;
+        }
+      }
+      this.heading = newHeading;
+      this.headingT = t;
+    }
+
+    this.prevPos = this.pos;
+    this.pos = { t: p.t, lat: p.lat, lon: p.lon, accuracy: acc };
+    this.gpsAgeT = t;
+    this.fixCount++;
+  };
+
+  /* --- IMU --------------------------------------------------------------- */
+  /* m = {t, ax, ay, az (incl. gravity, m/s^2), rx, ry, rz (deg/s) | null} */
+  Kinematics.prototype.pushMotion = function (m) {
+    var t = m.t / 1000;
+    var dt = this.motionT == null ? 0.02 : U.clamp(t - this.motionT, 0.001, 0.2);
+    this.motionT = t;
+    this.motionRate = this.motionRate * 0.95 + (1 / dt) * 0.05;
+    this.hasMotion = true;
+
+    var a = [m.ax, m.ay, m.az];
+    if (!isFinite(a[0]) || !isFinite(a[1]) || !isFinite(a[2])) return;
+
+    // 1. Gravity by low-pass, with two corrections that matter a lot in
+    //    practice. Stopped, the measured vector IS gravity, so track it fast
+    //    and lock the axis; moving, track very slowly or a sustained pull (a
+    //    long motorway on-ramp) gets absorbed into "gravity" and tilts the
+    //    vertical axis. Then renormalise: we know |g| = 9.80665, so any drift
+    //    in magnitude is error, not gravity.
+    if (!this.gravity) { this.gravity = a.slice(); this.gravSamples = 0; }
+    // Only refresh the estimate when the reading is plausibly pure gravity:
+    // stopped, or coasting with total magnitude near 1 g and no turn in
+    // progress. Pulling the average during a hard brake is what tilts the
+    // axis and makes every later reading wrong.
+    var mag = U.vLen(a);
+    var stopped = this.x[0] < 0.8;
+    var quasiStatic = Math.abs(mag - G) < 0.6 &&
+                      Math.abs(this.x[1]) < 0.8 &&
+                      Math.abs(this.yawRate) < U.toRad(4);
+    if (stopped || quasiStatic) {
+      var ag = U.emaAlpha(dt, stopped ? 0.5 : 4.0);
+      this.gravity[0] += ag * (a[0] - this.gravity[0]);
+      this.gravity[1] += ag * (a[1] - this.gravity[1]);
+      this.gravity[2] += ag * (a[2] - this.gravity[2]);
+      this.gravSamples = Math.min((this.gravSamples || 0) + 1, 100000);
+    }
+    // |g| is known, so any drift in magnitude is error rather than gravity.
+    var gl = U.vLen(this.gravity);
+    if (gl > 1e-6) {
+      var gk = G / gl;
+      this.gravity[0] *= gk; this.gravity[1] *= gk; this.gravity[2] *= gk;
+    }
+    var u = U.vNorm(this.gravity);            // unit vertical, device frame
+
+    // Linear acceleration, then its horizontal part.
+    var lin = U.vSub(a, this.gravity);
+    var aH = U.vReject(lin, u);
+
+    // 2. Yaw rate = spin about the vertical axis. No calibration needed.
+    if (m.rx != null && isFinite(m.rx)) {
+      this.hasGyro = true;
+      var w = [U.toRad(m.rx), U.toRad(m.ry), U.toRad(m.rz)];
+      // Learn gyro bias while genuinely stopped.
+      if (this.x[0] < 0.6) {
+        this.gyroBiasN = Math.min(this.gyroBiasN + 1, 4000);
+        var bw = 1 / this.gyroBiasN;
+        this.gyroBias[0] += bw * (w[0] - this.gyroBias[0]);
+        this.gyroBias[1] += bw * (w[1] - this.gyroBias[1]);
+        this.gyroBias[2] += bw * (w[2] - this.gyroBias[2]);
+      }
+      this.omega = U.vSub(w, this.gyroBias);
+      // Sign convention for accelerationIncludingGravity is not consistent
+      // across browsers (iOS has historically reported it inverted), and the
+      // phone may simply be mounted upside down. Either way "u" can point up
+      // or down, which would silently mirror every corner. Rather than assume,
+      // learn the sign by correlating against GPS heading change, which is
+      // unambiguous. Defaults to +1 until enough turns have been seen.
+      var yrRaw = U.vDot(this.omega, u);
+      if (Math.abs(this.yawRateGps) > 0.05 && Math.abs(yrRaw) > 0.05) {
+        this.yawSignAcc += yrRaw * this.yawRateGps * dt;
+      }
+      this.yawSign = this.yawSignAcc < -0.02 ? -1 : 1;
+      this.yawRate = yrRaw * this.yawSign;
+    } else {
+      this.yawRate = this.yawRateGps;
+    }
+
+    // 3. Solve the forward axis by correlating horizontal accel with the GPS
+    //    acceleration estimate. Only during straight-line speed changes, or
+    //    cornering would drag the estimate sideways.
+    var aGps = this.x[1];
+    var straight = Math.abs(this.yawRate) < U.toRad(6);
+    if (this.x[0] > 5 && Math.abs(aGps) > 0.5 && straight && this.accuracy != null && this.accuracy < 30) {
+      var wgt = dt * Math.min(Math.abs(aGps), 4);
+      this.fwdAcc[0] += aH[0] * aGps * wgt;
+      this.fwdAcc[1] += aH[1] * aGps * wgt;
+      this.fwdAcc[2] += aH[2] * aGps * wgt;
+      this.fwdMag += U.vLen(aH) * Math.abs(aGps) * wgt;
+      if (this.fwdMag > 0) {
+        var f = U.vNorm(U.vReject(this.fwdAcc, u));
+        if (U.vLen(f) > 0) this.forward = f;
+        // Amplitude correlation tops out well below 1 even for a perfectly
+        // solved axis, because the accelerometer only carries the AC part of
+        // the signal. What matters is that the direction has settled, so
+        // treat a ratio of 0.4 as fully converged and scale by how much
+        // evidence has accumulated.
+        var ratio = U.vLen(this.fwdAcc) / this.fwdMag;
+        this.calConf = U.clamp(ratio / 0.40, 0, 1) * U.clamp(this.fwdMag / 20, 0, 1);
+      }
+    }
+
+    if (this.forward) {
+      this.aLongImu = U.vDot(aH, this.forward);
+      var right = U.vScale(U.vCross(this.forward, u), this.yawSign);
+      this.aLatImu = U.vDot(aH, right);
+    }
+
+    this._fuse(dt, t);
+  };
+
+  /* Complementary fusion: GPS supplies the low-frequency truth (no drift),
+     the IMU supplies the fast detail (no 1 Hz smearing of a brake onset). */
+  Kinematics.prototype._fuse = function (dt, t) {
+    var aGps = this.x[1];
+    var aLp = U.emaAlpha(dt, 2.0);
+    this.aLongGpsLp += aLp * (aGps - this.aLongGpsLp);
+    this.aLongImuLp += aLp * (this.aLongImu - this.aLongImuLp);
+
+    var prev = this.aLong;
+    var usable = this.hasMotion && this.forward && this.calConf > 0.35 && this._gpsFresh(t);
+    if (usable) {
+      var blend = U.clamp((this.calConf - 0.35) / 0.35, 0, 1);
+      var fused = this.aLongGpsLp + (this.aLongImu - this.aLongImuLp);
+      this.aLong = fused * blend + aGps * (1 - blend);
+    } else {
+      this.aLong = aGps;
+    }
+    this.aLongGps = aGps;
+
+    // Lateral: v * yawRate is exact for planar vehicle motion, so it leads.
+    var v = this.x[0];
+    var latKin = -v * this.yawRate;            // +ve = accelerating right
+    if (this.hasGyro) {
+      this.aLat = latKin;
+    } else if (this.forward && this.calConf > 0.5) {
+      this.aLat = this.aLatImu;
+    } else {
+      this.aLat = -v * this.yawRateGps;
+    }
+    // Below walking pace lateral g is meaningless and mostly handling noise.
+    if (v < 2.0) this.aLat *= U.clamp((v - 0.5) / 1.5, 0, 1);
+
+    var jd = U.emaAlpha(dt, 0.35);
+    var rawJerk = dt > 0 ? (this.aLong - prev) / dt : 0;
+    this.jerk += jd * (U.clamp(rawJerk, -60, 60) - this.jerk);
+    this.tickT = t;
+  };
+
+  Kinematics.prototype._gpsFresh = function (t) {
+    return this.gpsAgeT != null && (t - this.gpsAgeT) < 5;
+  };
+
+  /* Advance time when no IMU is present (or between IMU samples). */
+  Kinematics.prototype.tick = function (tMs) {
+    var t = tMs / 1000;
+    if (this.lastPredictT != null) {
+      var dt = t - this.lastPredictT;
+      if (dt > 0) { this._predict(dt); this.lastPredictT = t; }
+    } else {
+      this.lastPredictT = t;
+    }
+    if (!this.hasMotion) {
+      var dt2 = this.tickT == null ? 0.05 : U.clamp(t - this.tickT, 0.001, 1);
+      this.yawRate = this.yawRateGps;
+      this._fuse(dt2, t);
+    }
+    return this.sample(tMs);
+  };
+
+  Kinematics.prototype.sample = function (tMs) {
+    return {
+      t: tMs,
+      speed: this.x[0],
+      aLong: this.aLong,
+      aLat: this.aLat,
+      jerk: this.jerk,
+      yawRate: this.yawRate,
+      heading: this.heading,
+      lat: this.pos ? this.pos.lat : null,
+      lon: this.pos ? this.pos.lon : null,
+      accuracy: this.accuracy,
+      distance: this.distance,
+      calConf: this.calConf,
+      hasMotion: this.hasMotion,
+      hasGyro: this.hasGyro,
+      motionRate: this.motionRate,
+      fixCount: this.fixCount,
+      gpsFresh: this._gpsFresh(tMs / 1000)
+    };
+  };
+
+  TL.Kinematics = Kinematics;
+})(window.TL = window.TL || {});
+
+/* ===== events.js ===== */
+/* Event detection.
+ *
+ * Every channel is a hysteresis state machine rather than a bare threshold
+ * compare: a sample must stay over the entry threshold for a minimum duration
+ * before an event opens, and must fall below a lower exit threshold before it
+ * closes. That is what stops one noisy GPS sample from logging a "harsh brake",
+ * and what stops a single long brake from being logged as fifteen of them.
+ */
+(function (TL) {
+  'use strict';
+  var U = TL.util, G = U.G;
+
+  // Entry thresholds in g. These sit in the range the industry generally uses
+  // (roughly 0.3 g noticeable, 0.4 g harsh, 0.5 g+ severe).
+  var BASE = {
+    brake:  { mild: 0.30, harsh: 0.40, severe: 0.52, minMs: 400, minSpeed: 4.5 },
+    accel:  { mild: 0.28, harsh: 0.37, severe: 0.48, minMs: 400, minSpeed: 4.5 },
+    corner: { mild: 0.32, harsh: 0.42, severe: 0.55, minMs: 700, minSpeed: 4.0 }
+  };
+  var SENSITIVITY = { lenient: 1.18, standard: 1.0, strict: 0.86 };
+
+  var SPEED_MIN_MS = 4000;      // sustained before it counts as speeding
+  var EXIT_RATIO = 0.72;
+  var EXIT_HOLD_MS = 350;
+  var COOLDOWN_MS = 2500;
+
+  function thresholdsFor(sensitivity) {
+    var k = SENSITIVITY[sensitivity] || 1;
+    var out = {};
+    Object.keys(BASE).forEach(function (ch) {
+      var b = BASE[ch];
+      out[ch] = {
+        mild: b.mild * k * G, harsh: b.harsh * k * G, severe: b.severe * k * G,
+        minMs: b.minMs, minSpeed: b.minSpeed
+      };
+    });
+    return out;
+  }
+
+  function severityOf(peak, th) {
+    var a = Math.abs(peak);
+    if (a >= th.severe) return 'severe';
+    if (a >= th.harsh) return 'harsh';
+    return 'mild';
+  }
+
+  function Detector(cfg) {
+    this.configure(cfg || {});
+    this.reset();
+  }
+
+  Detector.prototype.configure = function (cfg) {
+    this.sensitivity = cfg.sensitivity || 'standard';
+    this.th = thresholdsFor(this.sensitivity);
+  };
+
+  Detector.prototype.reset = function () {
+    var self = this;
+    this.ch = {};
+    ['brake', 'accel', 'corner'].forEach(function (name) {
+      self.ch[name] = { active: false, candT: null, t0: null, peak: 0, belowT: null, lastEnd: -1e12, snap: null };
+    });
+    this.speed = { active: false, candT: null, t0: null, peakOver: 0, belowT: null, lastEnd: -1e12, snap: null, peakSpeed: 0 };
+    this.events = [];
+  };
+
+  /* metricFor returns the signed value being tested for each channel. */
+  function metric(name, s) {
+    if (name === 'brake') return s.aLong < 0 ? -s.aLong : 0;
+    if (name === 'accel') return s.aLong > 0 ? s.aLong : 0;
+    return Math.abs(s.aLat);
+  }
+
+  Detector.prototype._runChannel = function (name, s, out) {
+    var th = this.th[name], st = this.ch[name];
+    var m = metric(name, s);
+    var eligible = s.speed >= th.minSpeed;
+    var over = eligible && m >= th.mild;
+
+    if (!st.active) {
+      if (over && (s.t - st.lastEnd) > COOLDOWN_MS) {
+        if (st.candT == null) { st.candT = s.t; st.peak = m; st.snap = snapshot(s); }
+        st.peak = Math.max(st.peak, m);
+        if (s.t - st.candT >= th.minMs) {
+          st.active = true; st.t0 = st.candT; st.belowT = null;
+        }
+      } else {
+        st.candT = null; st.peak = 0;
+      }
+      return;
+    }
+
+    st.peak = Math.max(st.peak, m);
+    if (m < th.mild * EXIT_RATIO || !eligible) {
+      if (st.belowT == null) st.belowT = s.t;
+      if (s.t - st.belowT >= EXIT_HOLD_MS) {
+        out.push(this._close(name, st, s));
+      }
+    } else {
+      st.belowT = null;
+    }
+  };
+
+  function snapshot(s) {
+    return { lat: s.lat, lon: s.lon, speed: s.speed, heading: s.heading, dist: s.distance };
+  }
+
+  Detector.prototype._close = function (name, st, s) {
+    var th = this.th[name];
+    var ev = {
+      id: U.uid(),
+      type: name,
+      severity: severityOf(st.peak, th),
+      t0: st.t0,
+      t1: st.belowT,
+      durMs: Math.max(0, st.belowT - st.t0),
+      peak: st.peak,
+      peakG: st.peak / G,
+      speedStart: st.snap ? st.snap.speed : s.speed,
+      speedEnd: s.speed,
+      lat: st.snap ? st.snap.lat : s.lat,
+      lon: st.snap ? st.snap.lon : s.lon,
+      dir: name === 'corner' ? (s.aLat >= 0 ? 'right' : 'left') : null,
+      distanceAt: s.distance
+    };
+    st.active = false; st.candT = null; st.peak = 0; st.belowT = null;
+    st.lastEnd = s.t; st.snap = null;
+    this.events.push(ev);
+    return ev;
+  };
+
+  /* Speeding is a different shape of event: not a spike, a sustained state. */
+  Detector.prototype._runSpeeding = function (s, limit, out) {
+    var st = this.speed;
+    if (limit == null || !(limit > 0)) {
+      if (st.active) { st.active = false; st.candT = null; }
+      return;
+    }
+    // Allow 5% plus ~1 mph before calling it speeding: GPS speed has real
+    // error, and flagging someone at 31 in a 30 would be noise, not insight.
+    var trigger = limit * 1.05 + 0.45;
+    var over = s.speed > trigger;
+
+    if (!st.active) {
+      if (over) {
+        if (st.candT == null) { st.candT = s.t; st.snap = snapshot(s); st.peakSpeed = s.speed; }
+        st.peakSpeed = Math.max(st.peakSpeed, s.speed);
+        if (s.t - st.candT >= SPEED_MIN_MS) { st.active = true; st.t0 = st.candT; st.belowT = null; st.limit = limit; }
+      } else { st.candT = null; }
+      return;
+    }
+    st.peakSpeed = Math.max(st.peakSpeed, s.speed);
+    st.limit = Math.max(st.limit || limit, limit);
+    if (s.speed <= limit * 1.01) {
+      if (st.belowT == null) st.belowT = s.t;
+      if (s.t - st.belowT >= 1500) {
+        var pctOver = (st.peakSpeed - st.limit) / st.limit * 100;
+        var ev = {
+          id: U.uid(), type: 'speeding',
+          severity: pctOver >= 20 ? 'severe' : (pctOver >= 10 ? 'harsh' : 'mild'),
+          t0: st.t0, t1: st.belowT, durMs: Math.max(0, st.belowT - st.t0),
+          peak: st.peakSpeed, peakG: 0,
+          limit: st.limit, pctOver: pctOver,
+          speedStart: st.snap ? st.snap.speed : s.speed, speedEnd: s.speed,
+          lat: st.snap ? st.snap.lat : s.lat, lon: st.snap ? st.snap.lon : s.lon,
+          distanceAt: s.distance
+        };
+        st.active = false; st.candT = null; st.belowT = null; st.snap = null; st.peakSpeed = 0;
+        this.events.push(ev);
+        out.push(ev);
+      }
+    } else {
+      st.belowT = null;
+    }
+  };
+
+  /* Feed one fused sample. Returns events that COMPLETED on this sample. */
+  Detector.prototype.update = function (s, limit) {
+    var out = [];
+    this._runChannel('brake', s, out);
+    this._runChannel('accel', s, out);
+    this._runChannel('corner', s, out);
+    this._runSpeeding(s, limit, out);
+    return out;
+  };
+
+  /* Anything still open when the trip ends. */
+  Detector.prototype.flush = function (s) {
+    var out = [], self = this;
+    ['brake', 'accel', 'corner'].forEach(function (name) {
+      var st = self.ch[name];
+      if (st.active) { st.belowT = s.t; out.push(self._close(name, st, s)); }
+    });
+    return out;
+  };
+
+  /* Live 0..1 intensity per channel, for the HUD meters. */
+  Detector.prototype.intensity = function (s) {
+    var self = this;
+    var r = {};
+    ['brake', 'accel', 'corner'].forEach(function (n) {
+      r[n] = U.clamp(metric(n, s) / self.th[n].severe, 0, 1.4);
+    });
+    return r;
+  };
+
+  TL.Detector = Detector;
+  TL.detectorThresholds = thresholdsFor;
+  TL.SEVERITY_ORDER = { mild: 1, harsh: 2, severe: 3 };
+})(window.TL = window.TL || {});
+
+/* ===== scoring.js ===== */
+/* Scoring model.
+ *
+ * Shape of the model, and why:
+ *  - Events are normalised per 100 km, not counted raw. Two harsh brakes on a
+ *    200 km motorway run is careful driving; two on a 2 km trip is not.
+ *  - Severity is weighted (mild 1, harsh 2.5, severe 5) so one emergency stop
+ *    does not read the same as one firm one.
+ *  - Each channel decays exponentially: score = 100 * exp(-k * rate). No cliff
+ *    edges, no way to reach zero from a single bad moment, and the marginal
+ *    cost of the tenth event is smaller than the first. Constants are set so a
+ *    rate of 5 weighted events per 100 km lands on 80.
+ *  - Short trips get an exposure floor and are flagged provisional, because a
+ *    per-100 km rate computed over 400 m is not a measurement.
+ */
+(function (TL) {
+  'use strict';
+  var U = TL.util;
+
+  var SEV_WEIGHT = { mild: 1, harsh: 2.5, severe: 5 };
+  var SPEED_SEV_WEIGHT = { mild: 1, harsh: 2, severe: 3.5 };
+  var EXPOSURE_FLOOR_KM = 2;
+
+  var WEIGHTS = {
+    speeding: 0.25, braking: 0.22, cornering: 0.20,
+    acceleration: 0.15, smoothness: 0.08, focus: 0.06, context: 0.04
+  };
+  // Anchored against how the industry generally reads event rates: roughly
+  // 3 weighted events per 100 km is good driving (~90), 10 is mediocre (~70),
+  // 25 is poor (~40). Acceleration decays more gently — harsh acceleration is
+  // a weaker crash predictor than harsh braking.
+  var DECAY = { braking: 0.0357, cornering: 0.0357, acceleration: 0.0300 };
+  var SPEED_DECAY = 0.0329;   // mean excess of 10% over the limit -> ~72
+  
+
+  var LABELS = {
+    speeding: 'Speed', braking: 'Braking', cornering: 'Cornering',
+    acceleration: 'Acceleration', smoothness: 'Smoothness',
+    focus: 'Focus', context: 'Context'
+  };
+
+  function decayScore(rate, k) {
+    return U.clamp(100 * Math.exp(-k * Math.max(0, rate)), 0, 100);
+  }
+
+  function weightedCount(events, type, table) {
+    var n = 0;
+    for (var i = 0; i < events.length; i++) {
+      if (events[i].type === type) n += (table[events[i].severity] || 1);
+    }
+    return n;
+  }
+  function rawCount(events, type) {
+    var n = 0;
+    for (var i = 0; i < events.length; i++) if (events[i].type === type) n++;
+    return n;
+  }
+
+  function band(score) {
+    if (score >= 90) return { key: 'excellent', label: 'Excellent', tone: 'good' };
+    if (score >= 80) return { key: 'good', label: 'Good', tone: 'good' };
+    if (score >= 70) return { key: 'fair', label: 'Fair', tone: 'warn' };
+    if (score >= 60) return { key: 'work', label: 'Needs work', tone: 'warn' };
+    return { key: 'risk', label: 'High risk', tone: 'crit' };
+  }
+
+  /* acc = accumulators produced by Trip.summary() */
+  function scoreTrip(acc) {
+    var events = acc.events || [];
+    var km = acc.distanceM / 1000;
+    var exposure100 = Math.max(km, EXPOSURE_FLOOR_KM) / 100;
+    var movingH = acc.movingMs / 3600000;
+    var comps = [];
+
+    ['braking', 'cornering', 'acceleration'].forEach(function (key) {
+      var type = key === 'braking' ? 'brake' : (key === 'acceleration' ? 'accel' : 'corner');
+      var w = weightedCount(events, type, SEV_WEIGHT);
+      var rate = w / exposure100;
+      comps.push({
+        key: key, label: LABELS[key], weight: WEIGHTS[key],
+        score: decayScore(rate, DECAY[key]),
+        rate: rate, count: rawCount(events, type),
+        unit: 'per 100 km', available: true
+      });
+    });
+
+    // Speeding: only meaningful where a limit was actually known. The measure
+    // is the time-weighted mean exceedance, so sitting 2 mph over for an hour
+    // and sitting 25 mph over for five minutes land in very different places.
+    var limitCoverage = acc.movingMs > 0 ? acc.limitKnownMs / acc.movingMs : 0;
+    var speedAvailable = limitCoverage >= 0.4 && acc.limitKnownMs > 20000;
+    var meanExcess = acc.meanExcessPct != null ? acc.meanExcessPct
+      : (acc.limitKnownMs > 0 ? (acc.excessPctMs || 0) / acc.limitKnownMs : 0);
+    var pctPlain = acc.limitKnownMs > 0 ?
+      ((acc.overMs.mild + acc.overMs.harsh + acc.overMs.severe) / acc.limitKnownMs) * 100 : 0;
+    comps.push({
+      key: 'speeding', label: LABELS.speeding, weight: WEIGHTS.speeding,
+      score: decayScore(meanExcess, SPEED_DECAY),
+      rate: pctPlain, count: rawCount(events, 'speeding'),
+      unit: '% of time over limit', available: speedAvailable,
+      coverage: limitCoverage, meanExcess: meanExcess,
+      maxOverPct: acc.maxOverPct || 0
+    });
+
+    // Smoothness: RMS jerk, the texture between the discrete events. Floored
+    // at 55 on purpose — it is a secondary signal measured on a noisy channel,
+    // so it should nudge a score, never drive it.
+    var jerk = acc.jerkRms || 0;
+    comps.push({
+      key: 'smoothness', label: LABELS.smoothness, weight: WEIGHTS.smoothness,
+      score: U.clamp(decayScore(Math.max(0, jerk - 0.30), 0.372), 55, 100),
+      rate: jerk, count: null, unit: 'm/s³ RMS jerk',
+      available: acc.movingMs > 30000
+    });
+
+    // Focus: screen taps while the vehicle is moving.
+    var perHour = movingH > 0.02 ? (acc.interactions || 0) / movingH : 0;
+    comps.push({
+      key: 'focus', label: LABELS.focus, weight: WEIGHTS.focus,
+      score: decayScore(perHour, 0.0372),
+      rate: perHour, count: acc.interactions || 0, unit: 'screen taps per hour',
+      available: acc.movingMs > 60000
+    });
+
+    // Context: night driving and time at the wheel without a break.
+    var nightFrac = acc.movingMs > 0 ? (acc.nightMs || 0) / acc.movingMs : 0;
+    var fatigue = Math.max(0, movingH - 2) * 12;
+    comps.push({
+      key: 'context', label: LABELS.context, weight: WEIGHTS.context,
+      score: U.clamp(100 - 25 * nightFrac - fatigue, 0, 100),
+      rate: nightFrac * 100, count: null, unit: '% at night (23:00–05:00)',
+      available: true
+    });
+
+    // Renormalise over whatever could actually be measured.
+    var totalW = 0, sum = 0;
+    comps.forEach(function (c) {
+      c.score = Math.round(c.score * 10) / 10;
+      if (c.available) { totalW += c.weight; sum += c.weight * c.score; }
+    });
+    var overall = totalW > 0 ? sum / totalW : 100;
+    comps.forEach(function (c) {
+      c.effectiveWeight = c.available && totalW > 0 ? c.weight / totalW : 0;
+      c.loss = c.available ? c.effectiveWeight * (100 - c.score) : 0;
+    });
+
+    var provisional = acc.distanceM < 1600 || acc.movingMs < 180000;
+    var ranked = comps.filter(function (c) { return c.available; })
+                      .slice().sort(function (a, b) { return b.loss - a.loss; });
+
+    return {
+      overall: Math.round(overall),
+      exact: overall,
+      band: band(overall),
+      components: comps,
+      provisional: provisional,
+      biggestLoss: ranked.length && ranked[0].loss > 0.4 ? ranked[0] : null,
+      speedMeasured: speedAvailable
+    };
+  }
+
+  /* Tip text for the component costing the most points. */
+  function advice(comp) {
+    if (!comp) return 'Nothing stands out — this trip scored evenly across every measure.';
+    switch (comp.key) {
+      case 'braking':
+        return 'Braking costs you the most here. Most harsh braking is a following-distance problem rather than a braking problem — lift earlier and the pedal work disappears.';
+      case 'cornering':
+        return 'Cornering costs you the most here. Lateral g builds with the square of speed, so shedding a few mph before the turn-in cuts it sharply.';
+      case 'acceleration':
+        return 'Acceleration costs you the most here. Pulling away more gradually from junctions and lights is the single easiest score to move.';
+      case 'speeding':
+        return 'Time over the limit costs you the most here. Sustained speeding is weighted by how far over you were, so the fast stretches matter more than brief overshoots.';
+      case 'smoothness':
+        return 'Smoothness costs you the most here. The inputs are jerky even where no single event tripped a threshold — steadier pedal pressure helps.';
+      case 'focus':
+        return 'Screen taps while moving cost you the most here. Set the app running before you pull away and leave it alone.';
+      case 'context':
+        return 'Context costs you the most here — night driving and long unbroken stints carry more risk regardless of how well you drove.';
+      default:
+        return '';
+    }
+  }
+
+  /* Aggregate across trips by summing exposure first, then scoring once.
+     Averaging per-trip scores would let a 500 m trip outvote a 200 km one. */
+  function aggregate(trips) {
+    if (!trips.length) return null;
+    var acc = {
+      distanceM: 0, movingMs: 0, totalMs: 0, limitKnownMs: 0,
+      overMs: { mild: 0, harsh: 0, severe: 0 },
+      events: [], interactions: 0, nightMs: 0, maxOverPct: 0, excessPctMs: 0,
+      jerkSum: 0, jerkW: 0
+    };
+    trips.forEach(function (t) {
+      var a = t.acc;
+      if (!a) return;
+      acc.distanceM += a.distanceM; acc.movingMs += a.movingMs; acc.totalMs += a.totalMs;
+      acc.limitKnownMs += a.limitKnownMs || 0;
+      acc.overMs.mild += a.overMs.mild; acc.overMs.harsh += a.overMs.harsh; acc.overMs.severe += a.overMs.severe;
+      acc.events = acc.events.concat(a.events || []);
+      acc.interactions += a.interactions || 0;
+      acc.nightMs += a.nightMs || 0;
+      acc.maxOverPct = Math.max(acc.maxOverPct, a.maxOverPct || 0);
+      acc.excessPctMs += a.excessPctMs || 0;
+      acc.jerkSum += (a.jerkRms || 0) * (a.movingMs || 0);
+      acc.jerkW += (a.movingMs || 0);
+    });
+    acc.jerkRms = acc.jerkW > 0 ? acc.jerkSum / acc.jerkW : 0;
+    acc.meanExcessPct = acc.limitKnownMs > 0 ? acc.excessPctMs / acc.limitKnownMs : 0;
+    var res = scoreTrip(acc);
+    res.trips = trips.length;
+    res.acc = acc;
+    return res;
+  }
+
+  TL.scoring = {
+    scoreTrip: scoreTrip, aggregate: aggregate, band: band, advice: advice,
+    WEIGHTS: WEIGHTS, SEV_WEIGHT: SEV_WEIGHT, LABELS: LABELS
+  };
+})(window.TL = window.TL || {});
+
+/* ===== trip.js ===== */
+/* Trip: owns the pipeline for one journey.
+   raw samples -> Kinematics (fusion) -> Detector (events) -> accumulators.
+   Live driving and the demo replay both run through this exact object, so the
+   demo is a genuine test of the scoring path rather than a mock-up of it. */
+(function (TL) {
+  'use strict';
+  var U = TL.util;
+
+  var ROUTE_INTERVAL_MS = 1000;
+  var MAX_ROUTE_POINTS = 5000;
+  var MOVING_SPEED = 0.7;          // m/s
+
+  function Trip(settings) {
+    this.settings = settings || {};
+    this.kin = new TL.Kinematics();
+    this.det = new TL.Detector({ sensitivity: this.settings.sensitivity || 'standard' });
+    this.reset();
+  }
+
+  Trip.prototype.reset = function () {
+    this.kin.reset();
+    this.det.reset();
+    this.startedAt = null;       // wall clock ms
+    this.t0 = null;              // pipeline clock ms
+    this.lastT = null;
+    this.endedAt = null;
+    this.limit = null;           // m/s, or null when unknown
+    this.limitSource = 'none';
+    this.route = [];
+    this.lastRouteT = null;
+    this.acc = {
+      distanceM: 0, movingMs: 0, idleMs: 0, totalMs: 0,
+      maxSpeed: 0, limitKnownMs: 0,
+      overMs: { mild: 0, harsh: 0, severe: 0 },
+      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0,
+      jerkSqSum: 0, jerkMs: 0, events: []
+    };
+    this.finished = false;
+  };
+
+  Trip.prototype.start = function (tMs, wallMs) {
+    this.t0 = tMs;
+    this.lastT = tMs;
+    this.startedAt = wallMs == null ? Date.now() : wallMs;
+    this.finished = false;
+  };
+
+  Trip.prototype.setSensitivity = function (s) {
+    this.det.configure({ sensitivity: s });
+  };
+
+  Trip.prototype.setLimit = function (mps, source) {
+    this.limit = (mps != null && mps > 0) ? mps : null;
+    this.limitSource = source || (this.limit ? 'manual' : 'none');
+  };
+
+  Trip.prototype.noteInteraction = function () {
+    if (this.finished) return;
+    var s = this.kin.sample(this.lastT || 0);
+    if (s.speed > 4.0) this.acc.interactions++;
+  };
+
+  Trip.prototype.feedPosition = function (p) { this.kin.pushPosition(p); };
+  Trip.prototype.feedMotion = function (m) { this.kin.pushMotion(m); };
+
+  /* Advance to time t, fold in accumulators, return what happened. */
+  Trip.prototype.tick = function (tMs) {
+    if (this.t0 == null) this.start(tMs);
+    var s = this.kin.tick(tMs);
+    var dt = this.lastT == null ? 0 : U.clamp(tMs - this.lastT, 0, 2000);
+    this.lastT = tMs;
+
+    var a = this.acc;
+    a.totalMs = tMs - this.t0;
+    a.distanceM = s.distance;
+    var moving = s.speed > MOVING_SPEED;
+    if (moving) {
+      a.movingMs += dt;
+      a.maxSpeed = Math.max(a.maxSpeed, s.speed);
+      a.jerkSqSum += s.jerk * s.jerk * dt;
+      a.jerkMs += dt;
+      var wall = this.startedAt + (tMs - this.t0);
+      var hr = new Date(wall).getHours();
+      if (hr >= 23 || hr < 5) a.nightMs += dt;
+      if (this.limit) {
+        a.limitKnownMs += dt;
+        var trigger = this.limit * 1.05 + 0.45;
+        if (s.speed > trigger) {
+          var pct = (s.speed - this.limit) / this.limit * 100;
+          a.maxOverPct = Math.max(a.maxOverPct, pct);
+          // Integrate how far over, above the 5% tolerance, so the measure
+          // scales with severity instead of being a binary over/not-over.
+          a.excessPctMs += Math.max(0, pct - 5) * dt;
+          if (pct >= 20) a.overMs.severe += dt;
+          else if (pct >= 10) a.overMs.harsh += dt;
+          else a.overMs.mild += dt;
+        }
+      }
+    } else {
+      a.idleMs += dt;
+    }
+
+    var newEvents = this.det.update(s, this.limit);
+    if (newEvents.length) a.events = a.events.concat(newEvents);
+
+    if (this.lastRouteT == null || tMs - this.lastRouteT >= ROUTE_INTERVAL_MS) {
+      this.lastRouteT = tMs;
+      if (s.lat != null) {
+        this.route.push({
+          t: Math.round(tMs - this.t0),
+          lat: Math.round(s.lat * 1e5) / 1e5,
+          lon: Math.round(s.lon * 1e5) / 1e5,
+          v: Math.round(s.speed * 10) / 10,
+          al: Math.round(s.aLong * 100) / 100,
+          at: Math.round(s.aLat * 100) / 100,
+          lim: this.limit ? Math.round(this.limit * 10) / 10 : null
+        });
+        if (this.route.length > MAX_ROUTE_POINTS) {
+          // Halve resolution rather than dropping the tail: the whole journey
+          // stays on the chart, just coarser.
+          this.route = this.route.filter(function (_, i) { return i % 2 === 0; });
+        }
+      }
+    }
+
+    return { sample: s, events: newEvents, intensity: this.det.intensity(s) };
+  };
+
+  Trip.prototype.stop = function (tMs) {
+    if (this.finished) return this.summary();
+    var t = tMs == null ? this.lastT : tMs;
+    var s = this.kin.sample(t);
+    var tail = this.det.flush(s);
+    if (tail.length) this.acc.events = this.acc.events.concat(tail);
+    this.endedAt = this.startedAt + (t - this.t0);
+    this.finished = true;
+    return this.summary();
+  };
+
+  Trip.prototype.summary = function () {
+    var a = this.acc;
+    var out = {
+      distanceM: a.distanceM, movingMs: a.movingMs, idleMs: a.idleMs,
+      totalMs: a.totalMs, maxSpeed: a.maxSpeed, limitKnownMs: a.limitKnownMs,
+      overMs: { mild: a.overMs.mild, harsh: a.overMs.harsh, severe: a.overMs.severe },
+      maxOverPct: a.maxOverPct, excessPctMs: a.excessPctMs,
+      meanExcessPct: a.limitKnownMs > 0 ? a.excessPctMs / a.limitKnownMs : 0,
+      nightMs: a.nightMs, interactions: a.interactions,
+      jerkRms: a.jerkMs > 0 ? Math.sqrt(a.jerkSqSum / a.jerkMs) : 0,
+      events: a.events.slice(),
+      avgSpeed: a.movingMs > 0 ? a.distanceM / (a.movingMs / 1000) : 0
+    };
+    return out;
+  };
+
+  /* A saveable record: summary + score + route + provenance. */
+  Trip.prototype.record = function (meta) {
+    var acc = this.summary();
+    var score = TL.scoring.scoreTrip(acc);
+    return {
+      id: U.uid(),
+      startedAt: this.startedAt,
+      endedAt: this.endedAt || Date.now(),
+      source: (meta && meta.source) || 'live',
+      profile: meta && meta.profile,
+      sensitivity: this.settings.sensitivity || 'standard',
+      limitSource: this.limitSource,
+      acc: acc,
+      score: { overall: score.overall, band: score.band.key, provisional: score.provisional },
+      route: this.route.slice(),
+      quality: {
+        hasMotion: this.kin.hasMotion,
+        hasGyro: this.kin.hasGyro,
+        calConf: Math.round(this.kin.calConf * 100) / 100,
+        fixes: this.kin.fixCount
+      }
+    };
+  };
+
+  TL.Trip = Trip;
+})(window.TL = window.TL || {});
+
+/* ===== storage.js ===== */
+/* Persistence. Everything stays in this browser — no account, no upload,
+   no server. That is a deliberate property of the app, not a limitation. */
+(function (TL) {
+  'use strict';
+  var SETTINGS_KEY = 'tl.settings.v1';
+  var TRIPS_KEY = 'tl.trips.v1';
+  var MAX_TRIPS = 200;
+
+  var DEFAULTS = {
+    units: 'mph',
+    sensitivity: 'standard',
+    voice: true,
+    beeps: true,
+    vibrate: true,
+    keepAwake: true,
+    limitMode: 'manual',        // 'manual' | 'off'
+    defaultLimit: 30,           // in display units
+    demoRate: 12,
+    demoProfile: 'average'
+  };
+
+  function safeGet(key) {
+    try { return window.localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function safeSet(key, val) {
+    try { window.localStorage.setItem(key, val); return true; }
+    catch (e) { return false; }
+  }
+
+  function loadSettings() {
+    var raw = safeGet(SETTINGS_KEY), out = {};
+    Object.keys(DEFAULTS).forEach(function (k) { out[k] = DEFAULTS[k]; });
+    if (raw) {
+      try {
+        var o = JSON.parse(raw);
+        Object.keys(DEFAULTS).forEach(function (k) {
+          if (o[k] !== undefined) out[k] = o[k];
+        });
+      } catch (e) { /* corrupt settings should not brick the app */ }
+    }
+    return out;
+  }
+  function saveSettings(s) { safeSet(SETTINGS_KEY, JSON.stringify(s)); }
+
+  function loadTrips() {
+    var raw = safeGet(TRIPS_KEY);
+    if (!raw) return [];
+    try {
+      var a = JSON.parse(raw);
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+
+  function writeTrips(trips) {
+    if (safeSet(TRIPS_KEY, JSON.stringify(trips))) return true;
+    // Out of quota: drop route geometry from the oldest trips first. Scores
+    // and events are the valuable part; the map line is not.
+    var copy = trips.map(function (t) { return t; });
+    for (var i = copy.length - 1; i >= 0; i--) {
+      if (copy[i].route && copy[i].route.length) {
+        copy[i] = Object.assign({}, copy[i], { route: [], routeDropped: true });
+        if (safeSet(TRIPS_KEY, JSON.stringify(copy))) {
+          trips.length = 0; Array.prototype.push.apply(trips, copy);
+          return true;
+        }
+      }
+    }
+    while (copy.length > 1) {
+      copy.pop();
+      if (safeSet(TRIPS_KEY, JSON.stringify(copy))) {
+        trips.length = 0; Array.prototype.push.apply(trips, copy);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function saveTrip(rec) {
+    var trips = loadTrips();
+    trips.unshift(rec);
+    while (trips.length > MAX_TRIPS) trips.pop();
+    return writeTrips(trips) ? trips : null;
+  }
+  function deleteTrip(id) {
+    var trips = loadTrips().filter(function (t) { return t.id !== id; });
+    writeTrips(trips);
+    return trips;
+  }
+  function clearTrips() {
+    safeSet(TRIPS_KEY, '[]');
+    return [];
+  }
+  function available() {
+    try {
+      window.localStorage.setItem('tl.probe', '1');
+      window.localStorage.removeItem('tl.probe');
+      return true;
+    } catch (e) { return false; }
+  }
+
+  TL.storage = {
+    DEFAULTS: DEFAULTS, loadSettings: loadSettings, saveSettings: saveSettings,
+    loadTrips: loadTrips, saveTrip: saveTrip, deleteTrip: deleteTrip,
+    clearTrips: clearTrips, available: available
+  };
+})(window.TL = window.TL || {});
+
+/* ===== alerts.js ===== */
+/* Real-time feedback. Deliberately restrained: an alert that fires constantly
+   gets ignored, and an alert that demands attention at the wrong moment is a
+   hazard. Tones are short, speech is throttled, and nothing repeats for the
+   same ongoing event. */
+(function (TL) {
+  'use strict';
+
+  var ctx = null;
+  var settings = { voice: true, beeps: true, vibrate: true };
+  var lastVoiceT = 0, lastBeepT = 0;
+  var VOICE_GAP_MS = 5000;
+  var BEEP_GAP_MS = 900;
+
+  function ensureCtx() {
+    if (ctx) return ctx;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try { ctx = new AC(); } catch (e) { return null; }
+    return ctx;
+  }
+
+  /* Must be called from a user gesture or iOS keeps the context suspended. */
+  function unlock() {
+    var c = ensureCtx();
+    if (c && c.state === 'suspended') c.resume();
+    return !!c;
+  }
+
+  function tone(freqs, durMs, gain) {
+    var c = ensureCtx();
+    if (!c || c.state === 'suspended') return;
+    var now = c.currentTime, step = durMs / 1000 / freqs.length;
+    var osc = c.createOscillator(), g = c.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freqs[0], now);
+    for (var i = 1; i < freqs.length; i++) {
+      osc.frequency.setValueAtTime(freqs[i], now + step * i);
+    }
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(gain || 0.16, now + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + durMs / 1000);
+    osc.connect(g); g.connect(c.destination);
+    osc.start(now); osc.stop(now + durMs / 1000 + 0.02);
+  }
+
+  var TONES = {
+    brake:    { mild: [520, 400], harsh: [620, 400, 300], severe: [700, 460, 320, 240] },
+    accel:    { mild: [400, 520], harsh: [380, 520, 660], severe: [360, 520, 700, 820] },
+    corner:   { mild: [480, 560], harsh: [500, 620, 500], severe: [520, 660, 520, 660] },
+    speeding: { mild: [660], harsh: [660, 660], severe: [740, 740, 740] }
+  };
+  var SPOKEN = {
+    brake: 'Harsh braking', accel: 'Harsh acceleration',
+    corner: 'Sharp corner', speeding: 'Over the limit'
+  };
+  var VIBE = { mild: [90], harsh: [110, 70, 110], severe: [150, 80, 150, 80, 150] };
+
+  function configure(s) {
+    settings.voice = !!s.voice;
+    settings.beeps = !!s.beeps;
+    settings.vibrate = !!s.vibrate;
+  }
+
+  function fire(ev) {
+    var now = Date.now();
+    if (settings.beeps && now - lastBeepT > BEEP_GAP_MS) {
+      var set = TONES[ev.type];
+      if (set) {
+        tone(set[ev.severity] || set.mild,
+             ev.severity === 'severe' ? 460 : (ev.severity === 'harsh' ? 340 : 200),
+             ev.severity === 'mild' ? 0.12 : 0.2);
+      }
+      lastBeepT = now;
+    }
+    if (settings.vibrate && navigator.vibrate) {
+      try { navigator.vibrate(VIBE[ev.severity] || VIBE.mild); } catch (e) {}
+    }
+    // Speak only for the events worth interrupting for.
+    if (settings.voice && ev.severity !== 'mild' && now - lastVoiceT > VOICE_GAP_MS) {
+      speak(SPOKEN[ev.type] || '');
+      lastVoiceT = now;
+    }
+  }
+
+  function speak(text) {
+    if (!text || !window.speechSynthesis) return;
+    try {
+      var u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.05; u.pitch = 1.0; u.volume = 0.9;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  function preview(type, severity) {
+    fire({ type: type, severity: severity || 'harsh' });
+  }
+
+  TL.alerts = {
+    unlock: unlock, configure: configure, fire: fire, speak: speak,
+    preview: preview, tone: tone,
+    supported: function () {
+      return {
+        audio: !!(window.AudioContext || window.webkitAudioContext),
+        speech: !!window.speechSynthesis,
+        vibrate: !!navigator.vibrate
+      };
+    }
+  };
+})(window.TL = window.TL || {});
+
+/* ===== sensors.js ===== */
+/* Hardware access + honest capability reporting.
+ *
+ * Everything here can legitimately fail: an insecure origin, a browser that
+ * never shipped DeviceMotion, iOS wanting an explicit gesture-bound grant, or
+ * an embedding page whose permissions policy silently withholds the sensors.
+ * The app is only useful if it says which of those happened, so probe() runs
+ * real requests and reports what actually came back rather than guessing from
+ * feature detection alone. */
+(function (TL) {
+  'use strict';
+
+  var geoWatch = null, motionHandler = null, wakeLock = null;
+
+  function inIframe() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
+  function statics() {
+    var hasMotionApi = typeof window.DeviceMotionEvent !== 'undefined';
+    return {
+      secure: window.isSecureContext !== false,
+      protocol: location.protocol,
+      geoApi: 'geolocation' in navigator,
+      motionApi: hasMotionApi,
+      motionNeedsGesture: hasMotionApi &&
+        typeof window.DeviceMotionEvent.requestPermission === 'function',
+      wakeLockApi: 'wakeLock' in navigator,
+      vibrateApi: !!navigator.vibrate,
+      iframe: inIframe(),
+      storage: TL.storage.available()
+    };
+  }
+
+  /* Ask for motion permission. Must be called synchronously from a tap. */
+  function requestMotion() {
+    var hasApi = typeof window.DeviceMotionEvent !== 'undefined';
+    if (!hasApi) return Promise.resolve({ ok: false, state: 'unsupported' });
+    if (typeof window.DeviceMotionEvent.requestPermission !== 'function') {
+      return Promise.resolve({ ok: true, state: 'granted' });
+    }
+    return window.DeviceMotionEvent.requestPermission()
+      .then(function (r) { return { ok: r === 'granted', state: r }; })
+      .catch(function (e) { return { ok: false, state: 'error', message: String(e && e.message || e) }; });
+  }
+
+  /* Listen for one real devicemotion event; silence means blocked or absent. */
+  function probeMotion(timeoutMs) {
+    return new Promise(function (resolve) {
+      if (typeof window.DeviceMotionEvent === 'undefined') {
+        resolve({ ok: false, reason: 'No DeviceMotion API in this browser.' });
+        return;
+      }
+      var done = false;
+      function onEvt(e) {
+        if (done) return;
+        done = true;
+        window.removeEventListener('devicemotion', onEvt);
+        clearTimeout(timer);
+        var a = e.accelerationIncludingGravity;
+        var r = e.rotationRate;
+        var hasAcc = !!(a && (a.x !== null || a.y !== null || a.z !== null));
+        var hasGyro = !!(r && (r.alpha !== null || r.beta !== null || r.gamma !== null));
+        resolve({
+          ok: hasAcc, gyro: hasGyro,
+          interval: e.interval || null,
+          reason: hasAcc ? null : 'Events fire but carry no accelerometer values.'
+        });
+      }
+      var timer = setTimeout(function () {
+        if (done) return;
+        done = true;
+        window.removeEventListener('devicemotion', onEvt);
+        resolve({
+          ok: false,
+          reason: inIframe()
+            ? 'No motion events arrived. The page is embedded, and the embedding page must allow accelerometer and gyroscope.'
+            : 'No motion events arrived. The device may have no motion sensors, or permission was refused.'
+        });
+      }, timeoutMs || 1800);
+      window.addEventListener('devicemotion', onEvt);
+    });
+  }
+
+  function probeGeo(timeoutMs) {
+    return new Promise(function (resolve) {
+      if (!('geolocation' in navigator)) {
+        resolve({ ok: false, reason: 'No Geolocation API in this browser.' });
+        return;
+      }
+      var done = false;
+      var timer = setTimeout(function () {
+        if (done) return;
+        done = true;
+        resolve({ ok: false, reason: 'Timed out waiting for a position fix.' });
+      }, (timeoutMs || 12000) + 500);
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        resolve({
+          ok: true,
+          accuracy: pos.coords.accuracy,
+          hasSpeed: pos.coords.speed !== null && pos.coords.speed !== undefined,
+          hasHeading: pos.coords.heading !== null && pos.coords.heading !== undefined
+        });
+      }, function (err) {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        var reason;
+        if (err.code === 1) {
+          reason = inIframe()
+            ? 'Location was denied. Either you declined the prompt, or the embedding page does not allow geolocation.'
+            : 'Location was denied. Allow location for this site in your browser settings.';
+        } else if (err.code === 2) {
+          reason = 'Position unavailable — no satellite or network fix yet. Outdoors with a clear view of the sky works best.';
+        } else {
+          reason = 'Timed out waiting for a position fix.';
+        }
+        resolve({ ok: false, code: err.code, reason: reason });
+      }, { enableHighAccuracy: true, timeout: timeoutMs || 12000, maximumAge: 0 });
+    });
+  }
+
+  function probe() {
+    var s = statics();
+    if (!s.secure) {
+      return Promise.resolve({
+        statics: s, geo: { ok: false, reason: 'Sensors need a secure origin. Open the page over https:// or on localhost.' },
+        motion: { ok: false, reason: 'Sensors need a secure origin.' }
+      });
+    }
+    return Promise.all([probeGeo(12000), probeMotion(1800)]).then(function (r) {
+      return { statics: s, geo: r[0], motion: r[1] };
+    });
+  }
+
+  /* --- live streams ------------------------------------------------------ */
+  function startGeo(onFix, onError) {
+    stopGeo();
+    if (!('geolocation' in navigator)) {
+      if (onError) onError({ code: 0, message: 'Geolocation unsupported' });
+      return false;
+    }
+    geoWatch = navigator.geolocation.watchPosition(function (pos) {
+      var c = pos.coords;
+      onFix({
+        t: Date.now(),
+        lat: c.latitude, lon: c.longitude,
+        speed: (c.speed === null || c.speed === undefined || isNaN(c.speed)) ? null : c.speed,
+        heading: (c.heading === null || c.heading === undefined || isNaN(c.heading)) ? null : c.heading,
+        accuracy: c.accuracy,
+        speedAccuracy: c.speedAccuracy != null ? c.speedAccuracy : null
+      });
+    }, function (err) { if (onError) onError(err); },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    return true;
+  }
+  function stopGeo() {
+    if (geoWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(geoWatch);
+    geoWatch = null;
+  }
+
+  function startMotion(onMotion) {
+    stopMotion();
+    if (typeof window.DeviceMotionEvent === 'undefined') return false;
+    motionHandler = function (e) {
+      var a = e.accelerationIncludingGravity;
+      if (!a || a.x === null) return;
+      var r = e.rotationRate;
+      onMotion({
+        t: Date.now(),
+        ax: a.x, ay: a.y, az: a.z,
+        // DeviceMotion names rotation by Euler angle: alpha about z, beta
+        // about x, gamma about y. Reorder into a plain (x, y, z) vector.
+        rx: r && r.beta != null ? r.beta : null,
+        ry: r && r.gamma != null ? r.gamma : null,
+        rz: r && r.alpha != null ? r.alpha : null
+      });
+    };
+    window.addEventListener('devicemotion', motionHandler);
+    return true;
+  }
+  function stopMotion() {
+    if (motionHandler) window.removeEventListener('devicemotion', motionHandler);
+    motionHandler = null;
+  }
+
+  function keepAwake(on) {
+    if (!('wakeLock' in navigator)) return Promise.resolve(false);
+    if (!on) {
+      if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+      return Promise.resolve(false);
+    }
+    return navigator.wakeLock.request('screen').then(function (l) {
+      wakeLock = l;
+      l.addEventListener('release', function () { wakeLock = null; });
+      return true;
+    }).catch(function () { return false; });
+  }
+  function reacquireWakeLock() {
+    if (document.visibilityState === 'visible' && wakeLock === null) keepAwake(true);
+  }
+
+  TL.sensors = {
+    statics: statics, probe: probe, probeGeo: probeGeo, probeMotion: probeMotion,
+    requestMotion: requestMotion,
+    startGeo: startGeo, stopGeo: stopGeo,
+    startMotion: startMotion, stopMotion: stopMotion,
+    keepAwake: keepAwake, reacquireWakeLock: reacquireWakeLock,
+    inIframe: inIframe
+  };
+})(window.TL = window.TL || {});
+
+/* ===== simulate.js ===== */
+/* Synthetic drive generator.
+ *
+ * This is not a mock: it integrates a vehicle model, mounts a virtual phone at
+ * an arbitrary angle in the cradle, adds GPS and sensor noise, and emits the
+ * same DeviceMotion / Geolocation shaped samples the real hardware would. The
+ * demo therefore exercises the actual fusion, detection and scoring code —
+ * if the demo scores you harshly, the road will too.
+ */
+(function (TL) {
+  'use strict';
+  var U = TL.util, G = U.G;
+  var MPH = 0.44704;
+
+  var PROFILES = {
+    smooth: {
+      label: 'Careful', blurb: 'Gentle inputs, reads the road ahead, sits on the limit.',
+      accel: 1.4, brake: 2.2, jerkLimit: 1.6, cornerG: 0.20,
+      overFactor: 0.01, overVar: 0.02, incidentRate: 0.22, incidentBrake: 3.7
+    },
+    average: {
+      label: 'Typical', blurb: 'Ordinary commuting: brisk pull-aways, a bit over on the fast roads.',
+      accel: 2.2, brake: 3.1, jerkLimit: 2.8, cornerG: 0.29,
+      overFactor: 0.07, overVar: 0.05, incidentRate: 0.35, incidentBrake: 4.6
+    },
+    aggressive: {
+      label: 'Hurried', blurb: 'Late braking, quick turn-in, consistently over the limit.',
+      accel: 3.4, brake: 4.8, jerkLimit: 5.5, cornerG: 0.44,
+      overFactor: 0.17, overVar: 0.07, incidentRate: 0.85, incidentBrake: 6.2
+    }
+  };
+
+  /* A UK-shaped commute: estate roads, an A-road, a stretch of motorway, then
+     back into town. Limits in mph, converted on the way in. */
+  function buildPlan(prof, rnd) {
+    var p = [];
+    function over(limit) {
+      var f = prof.overFactor + (rnd() - 0.5) * 2 * prof.overVar;
+      return limit * (1 + Math.max(-0.08, f));
+    }
+    function road(limitMph, holdS, opts) {
+      opts = opts || {};
+      var lim = limitMph * MPH;
+      p.push({ op: 'limit', v: lim });
+      // Real roads bend continuously. Faster roads are built straighter, so
+      // curvature falls as the limit rises. This is well under any cornering
+      // threshold — which is the point: ordinary road curvature must not be
+      // mistaken for a harsh corner.
+      var bend = limitMph <= 30 ? 0.090 : (limitMph <= 40 ? 0.072
+               : (limitMph <= 50 ? 0.050 : (limitMph <= 60 ? 0.038 : 0.020)));
+      p.push({
+        op: 'target', v: over(lim), hold: holdS, traffic: opts.traffic !== false,
+        bend: bend, phase: rnd() * 6.283, period: 9 + rnd() * 14 + limitMph * 0.35
+      });
+    }
+    function junction(deg, entryMph) {
+      p.push({ op: 'target', v: entryMph * MPH, hold: 0 });
+      p.push({ op: 'turn', deg: deg, g: prof.cornerG * (0.9 + rnd() * 0.3) });
+    }
+    function lights(waitS) {
+      p.push({ op: 'target', v: 0, hold: waitS });
+    }
+
+    p.push({ op: 'idle', hold: 4 });
+    road(30, 25);                       // pull out of the estate
+    junction(-85, 15);                  // left at the end of the road
+    road(30, 30);
+    junction(70, 14);                   // right onto the through road
+    road(30, 35);
+    lights(12);                         // red light
+    road(30, 20);
+    junction(150, 18);                  // roundabout, second exit
+    road(40, 40);
+    junction(-40, 30);
+    road(40, 35);
+    road(60, 80);                       // A-road
+    junction(-25, 45);                  // sweeping bend, taken at speed
+    road(60, 70);
+    junction(30, 42);
+    road(60, 55);
+    road(70, 100, { traffic: false });  // motorway
+    p.push({ op: 'lane' });             // lane change
+    road(70, 90, { traffic: false });
+    p.push({ op: 'lane' });
+    road(50, 40);                       // exit slip
+    junction(120, 16);                  // roundabout at the top
+    road(40, 60);
+    junction(-75, 14);
+    road(30, 65);
+    junction(50, 13);
+    road(30, 45);
+    lights(9);
+    road(30, 40);
+    junction(88, 12);                   // right into the street
+    road(20, 30);
+    p.push({ op: 'target', v: 0, hold: 3 });
+    return p;
+  }
+
+  /* Vehicle + phone-mount simulation. Returns a flat, time-ordered sample list. */
+  function generate(profileKey, seed) {
+    var prof = PROFILES[profileKey] || PROFILES.average;
+    var rnd = U.mulberry32(seed == null ? 20260828 : seed);
+    var plan = buildPlan(prof, rnd);
+
+    // Phone sits in a cradle: rotated in its holder and tilted back. The
+    // algorithm has to work this out for itself.
+    var psi = U.toRad(-38 + rnd() * 76);      // rotation in the cradle
+    var theta = U.toRad(18 + rnd() * 30);     // tilt back from vertical
+    var M = mountMatrix(psi, theta);
+
+    var dt = 0.05, t = 0;
+    var v = 0, heading = 20 + rnd() * 320, lat = 51.4816 + rnd() * 0.02, lon = -2.6 + rnd() * 0.02;
+    var a = 0, yaw = 0, targetV = 0, limit = null;
+    var samples = [], idx = 0, stepT = 0, turned = 0, laneT = 0;
+    var nextIncident = 20 + rnd() * 60;
+    var incidentT = -1, incidentA = 0;
+    var gpsT = 0;
+
+    function cur() { return plan[idx]; }
+
+    while (idx < plan.length && t < 3600) {
+      var c = cur();
+      var done = false;
+      yaw = 0;
+
+      if (c.op === 'limit') { limit = c.v; idx++; continue; }
+
+      if (c.op === 'idle') {
+        targetV = 0;
+        if (stepT >= c.hold) done = true;
+      } else if (c.op === 'target') {
+        targetV = c.v;
+        // Traffic: the car in front slows, you react.
+        if (c.traffic && t > nextIncident && v > 8) {
+          if (rnd() < prof.incidentRate * dt * 2) {
+            incidentT = t + 1.2 + rnd() * 2.0;
+            incidentA = -prof.incidentBrake * (0.75 + rnd() * 0.35);
+            nextIncident = t + 35 + rnd() * 90;
+          }
+        }
+        // Follow the curve of the road while cruising.
+        if (c.bend && v > 3) {
+          var w = 2 * Math.PI / c.period;
+          var curve = c.bend * (0.7 * Math.sin(t * w + c.phase) +
+                                0.3 * Math.sin(t * w * 2.7 + c.phase * 1.9));
+          yaw = (curve * G) / Math.max(v, 4);
+        }
+        var settled = Math.abs(v - targetV) < Math.max(0.5, targetV * 0.06);
+        if (settled && stepT >= (c.hold || 0)) done = true;
+        if (c.hold === 0 && settled) done = true;
+      } else if (c.op === 'turn') {
+        targetV = Math.max(v, 3);
+        var sgn = c.deg >= 0 ? 1 : -1;
+        // Hold the profile's lateral g; yaw rate follows from current speed.
+        var wanted = (c.g * G) / Math.max(v, 3);
+        yaw = sgn * Math.min(wanted, U.toRad(45));
+        turned += Math.abs(U.toDeg(yaw)) * dt;
+        if (turned >= Math.abs(c.deg)) { turned = 0; done = true; }
+      } else if (c.op === 'lane') {
+        laneT += dt;
+        yaw = U.toRad(3.2) * Math.sin(laneT * Math.PI / 1.6);
+        if (laneT >= 3.2) { laneT = 0; done = true; }
+      }
+
+      // Longitudinal controller with a jerk limit, so pedal inputs ramp.
+      var desired;
+      if (incidentT > 0 && t < incidentT) {
+        desired = incidentA;
+      } else {
+        if (incidentT > 0 && t >= incidentT) incidentT = -1;
+        var err = targetV - v;
+        desired = U.clamp(err * 0.55, -prof.brake, prof.accel);
+        if (v < 0.3 && targetV < 0.3) desired = 0;
+      }
+      // Cornering costs a little speed, as it does in a real car.
+      if (Math.abs(yaw) > U.toRad(6)) desired = Math.min(desired, 0.4);
+      var maxDa = prof.jerkLimit * dt;
+      a += U.clamp(desired - a, -maxDa, maxDa);
+      a += (rnd() - 0.5) * 0.10;
+
+      v = Math.max(0, v + a * dt);
+      if (v === 0) a = Math.max(a, 0);
+      heading = (heading - U.toDeg(yaw) * dt + 360) % 360;
+      var pnt = U.offsetLatLon(lat, lon,
+        v * dt * Math.sin(U.toRad(heading)), v * dt * Math.cos(U.toRad(heading)));
+      lat = pnt.lat; lon = pnt.lon;
+
+      // --- emit IMU sample (device frame, with gravity and noise) ---
+      var aLat = -v * yaw;                       // +ve = accelerating right
+      var accVeh = [aLat, a, (rnd() - 0.5) * 0.55];   // z: road surface buzz
+      var accDev = mul(M, accVeh);
+      var gDev = mul(M, [0, 0, G]);
+      var wDev = mul(M, [0, 0, U.toDeg(yaw)]);
+      samples.push({
+        k: 'm', t: Math.round(t * 1000),
+        ax: accDev[0] + gDev[0] + nz(rnd, 0.09),
+        ay: accDev[1] + gDev[1] + nz(rnd, 0.09),
+        az: accDev[2] + gDev[2] + nz(rnd, 0.09),
+        rx: wDev[0] + nz(rnd, 0.25), ry: wDev[1] + nz(rnd, 0.25), rz: wDev[2] + nz(rnd, 0.25)
+      });
+
+      // --- emit a GPS fix once a second, with realistic error ---
+      if (t >= gpsT) {
+        gpsT += 1.0;
+        var acc = 4 + rnd() * 6;
+        var jitter = acc * 0.35;
+        var jp = U.offsetLatLon(lat, lon, nz(rnd, jitter), nz(rnd, jitter));
+        samples.push({
+          k: 'g', t: Math.round(t * 1000), lat: jp.lat, lon: jp.lon,
+          speed: Math.max(0, v + nz(rnd, 0.35)),
+          heading: v > 1.5 ? (heading + nz(rnd, 3)) % 360 : null,
+          accuracy: acc, limit: limit
+        });
+      }
+
+      stepT += dt; t += dt;
+      if (done) { idx++; stepT = 0; }
+    }
+
+    return {
+      profile: profileKey, label: prof.label, blurb: prof.blurb,
+      samples: samples, durationMs: Math.round(t * 1000), seed: seed
+    };
+  }
+
+  function nz(rnd, s) { return (rnd() + rnd() + rnd() - 1.5) * s; }
+
+  /* Orthonormal vehicle->device rotation: yaw in the cradle, then tilt back. */
+  function mountMatrix(psi, theta) {
+    var cz = Math.cos(psi), sz = Math.sin(psi);
+    var cx = Math.cos(theta), sx = Math.sin(theta);
+    var Rz = [[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]];
+    var Rx = [[1, 0, 0], [0, cx, -sx], [0, sx, cx]];
+    return matmul(Rx, Rz);
+  }
+  function matmul(A, B) {
+    var C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) {
+      C[i][j] = A[i][0] * B[0][j] + A[i][1] * B[1][j] + A[i][2] * B[2][j];
+    }
+    return C;
+  }
+  function mul(M, v) {
+    return [
+      M[0][0] * v[0] + M[0][1] * v[1] + M[0][2] * v[2],
+      M[1][0] * v[0] + M[1][1] * v[1] + M[1][2] * v[2],
+      M[2][0] * v[0] + M[2][1] * v[1] + M[2][2] * v[2]
+    ];
+  }
+
+  /* Player: pushes a generated drive into a Trip on a virtual clock. */
+  function Player(trip, drive, opts) {
+    this.trip = trip; this.drive = drive;
+    this.rate = (opts && opts.rate) || 10;
+    this.onTick = opts && opts.onTick;
+    this.onEvent = opts && opts.onEvent;
+    this.onDone = opts && opts.onDone;
+    this.i = 0; this.vt = 0; this.raf = null; this.running = false;
+  }
+
+  Player.prototype.start = function () {
+    var self = this;
+    this.running = true;
+    this.trip.start(0, Date.now());
+    var last = performance.now();
+    function frame(now) {
+      if (!self.running) return;
+      var real = Math.min(now - last, 250);
+      last = now;
+      self.advance(self.vt + real * self.rate);
+      if (self.i >= self.drive.samples.length) { self.finish(); return; }
+      self.raf = requestAnimationFrame(frame);
+    }
+    this.raf = requestAnimationFrame(frame);
+  };
+
+  /* Feed every sample up to virtual time vt, ticking the trip as we go. */
+  Player.prototype.advance = function (vt) {
+    var s = this.drive.samples, lastTick = this.vt;
+    while (this.i < s.length && s[this.i].t <= vt) {
+      var smp = s[this.i++];
+      if (smp.k === 'm') {
+        this.trip.feedMotion(smp);
+      } else {
+        if (smp.limit != null) this.trip.setLimit(smp.limit, 'demo');
+        this.trip.feedPosition(smp);
+      }
+      if (smp.t - lastTick >= 50) {
+        var r = this.trip.tick(smp.t);
+        lastTick = smp.t;
+        if (r.events.length && this.onEvent) this.onEvent(r.events);
+        if (this.onTick) this.onTick(r);
+      }
+    }
+    this.vt = vt;
+  };
+
+  /* Score the whole drive with no animation, for instant comparisons. */
+  Player.prototype.runInstant = function () {
+    this.trip.start(0, Date.now());
+    this.advance(this.drive.durationMs + 1000);
+    this.trip.stop(this.drive.durationMs);
+    return this.trip;
+  };
+
+  Player.prototype.finish = function () {
+    if (!this.running) return;
+    this.running = false;
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.trip.stop(this.drive.durationMs);
+    if (this.onDone) this.onDone(this.trip);
+  };
+
+  Player.prototype.stop = function () {
+    this.running = false;
+    if (this.raf) cancelAnimationFrame(this.raf);
+  };
+
+  TL.simulate = { PROFILES: PROFILES, generate: generate, Player: Player };
+})(window.TL = window.TL || {});
+
+/* ===== exporters.js ===== */
+/* Your data, in formats other tools actually read. Trips never leave the
+   device unless you export them yourself. */
+(function (TL) {
+  'use strict';
+  var U = TL.util;
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function toGPX(trip) {
+    var name = 'Drive ' + new Date(trip.startedAt).toISOString();
+    var pts = (trip.route || []).map(function (p) {
+      var t = new Date(trip.startedAt + p.t).toISOString();
+      return '      <trkpt lat="' + p.lat + '" lon="' + p.lon + '">\n' +
+             '        <time>' + t + '</time>\n' +
+             '        <extensions><speed>' + p.v + '</speed></extensions>\n' +
+             '      </trkpt>';
+    }).join('\n');
+    var wpts = (trip.acc.events || []).filter(function (e) { return e.lat != null; })
+      .map(function (e) {
+        return '  <wpt lat="' + e.lat + '" lon="' + e.lon + '">\n' +
+               '    <name>' + esc(e.severity + ' ' + e.type) + '</name>\n' +
+               '    <time>' + new Date(trip.startedAt + (e.t0 || 0)).toISOString() + '</time>\n' +
+               '  </wpt>';
+      }).join('\n');
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<gpx version="1.1" creator="Driving Telematics" xmlns="http://www.topografix.com/GPX/1/1">\n' +
+      (wpts ? wpts + '\n' : '') +
+      '  <trk><name>' + esc(name) + '</name><trkseg>\n' + pts + '\n  </trkseg></trk>\n</gpx>\n';
+  }
+
+  function eventsCSV(trips, units) {
+    var rows = [['trip_started', 'event_time', 'type', 'severity', 'peak_g',
+                 'duration_s', 'speed_' + (units === 'kmh' ? 'kmh' : 'mph'),
+                 'limit_' + (units === 'kmh' ? 'kmh' : 'mph'), 'pct_over', 'lat', 'lon']];
+    trips.forEach(function (t) {
+      (t.acc.events || []).forEach(function (e) {
+        rows.push([
+          new Date(t.startedAt).toISOString(),
+          new Date(t.startedAt + (e.t0 || 0)).toISOString(),
+          e.type, e.severity,
+          e.type === 'speeding' ? '' : (e.peakG || 0).toFixed(3),
+          ((e.durMs || 0) / 1000).toFixed(1),
+          U.speedIn(e.type === 'speeding' ? e.peak : e.speedStart, units).toFixed(1),
+          e.limit != null ? U.speedIn(e.limit, units).toFixed(0) : '',
+          e.pctOver != null ? e.pctOver.toFixed(1) : '',
+          e.lat != null ? e.lat.toFixed(6) : '',
+          e.lon != null ? e.lon.toFixed(6) : ''
+        ]);
+      });
+    });
+    return rows.map(function (r) {
+      return r.map(function (c) {
+        var s = String(c);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }).join(',');
+    }).join('\n');
+  }
+
+  function tripsJSON(trips) {
+    return JSON.stringify({
+      exported: new Date().toISOString(),
+      app: 'Driving Telematics',
+      trips: trips
+    }, null, 2);
+  }
+
+  /* Some embedded viewers block downloads outright, so always offer the
+     clipboard as a fallback rather than failing silently. */
+  function download(filename, text, mime) {
+    try {
+      var blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function copy(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(function () { return true; })
+        .catch(function () { return legacyCopy(text); });
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) { return false; }
+  }
+
+  TL.exporters = {
+    toGPX: toGPX, eventsCSV: eventsCSV, tripsJSON: tripsJSON,
+    download: download, copy: copy
+  };
+})(window.TL = window.TL || {});
+
+/* ===== charts.js ===== */
+/* Canvas instruments. All of them are drawn from the same token palette as the
+   page so the charts read as part of the interface rather than bolted on. */
+(function (TL) {
+  'use strict';
+  var U = TL.util, G = U.G;
+
+  var C = {
+    ground: '#0B0E13', panel: '#141A21', line: '#212B36', line2: '#2C3844',
+    ink: '#E9EEF4', muted: '#8494A5', dim: '#5A6875',
+    accent: '#38C6E0', good: '#3FBF7F', warn: '#E9A13B', crit: '#EF4F4F'
+  };
+  var SEV = { mild: C.warn, harsh: C.warn, severe: C.crit };
+  var TYPE_COLOR = { brake: C.crit, accel: C.accent, corner: C.warn, speeding: '#C77DFF' };
+
+  /* Size a canvas for the device pixel ratio and return a ready 2D context. */
+  function fit(canvas) {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var r = canvas.getBoundingClientRect();
+    var w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr; canvas.height = h * dpr;
+    }
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    // A canvas on a hidden screen measures 0x0. Report that rather than
+    // drawing with negative radii and throwing.
+    return { ctx: ctx, w: w, h: h, ok: r.width > 8 && r.height > 8 };
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /* --- g-g diagram ------------------------------------------------------- */
+  /* The classic traction-circle plot: longitudinal g up/down, lateral g
+     left/right. A smooth driver traces a small blob near the centre; a hurried
+     one throws the dot out to the rings. */
+  function gMeter(canvas, cur, trail, thresholds) {
+    var f = fit(canvas);
+    if (!f.ok) return;
+    var ctx = f.ctx;
+    var cx = f.w / 2, cy = f.h / 2;
+    var R = Math.min(f.w, f.h) / 2 - 18;
+    var maxG = 0.7;
+    var scale = R / maxG;
+
+    // Rings at the thresholds that actually matter, labelled.
+    var rings = [
+      { g: 0.2, c: C.line, label: null },
+      { g: (thresholds && thresholds.mild) || 0.30, c: C.line2, label: 'mild' },
+      { g: (thresholds && thresholds.harsh) || 0.40, c: 'rgba(233,161,59,0.45)', label: 'harsh' },
+      { g: (thresholds && thresholds.severe) || 0.52, c: 'rgba(239,79,79,0.5)', label: 'severe' }
+    ];
+    rings.forEach(function (r) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r.g * scale, 0, Math.PI * 2);
+      ctx.strokeStyle = r.c;
+      ctx.lineWidth = 1;
+      ctx.setLineDash(r.label ? [3, 4] : []);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // Cross-hairs
+    ctx.strokeStyle = C.line;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
+    ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
+    ctx.stroke();
+
+    ctx.font = '500 9px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.fillStyle = C.dim;
+    ctx.textAlign = 'center';
+    ctx.fillText('ACCEL', cx, cy - R - 6);
+    ctx.fillText('BRAKE', cx, cy + R + 12);
+    // Sit these inside the plot: at phone widths there is no room outside
+    // the circle and they were being clipped by the canvas edge.
+    ctx.textAlign = 'left';
+    ctx.fillText('LEFT', cx - R + 2, cy - 7);
+    ctx.textAlign = 'right';
+    ctx.fillText('RIGHT', cx + R - 2, cy - 7);
+
+    // Trail: recent history fading out, so you see the shape of the last
+    // few seconds of driving, not just an instant.
+    if (trail && trail.length > 1) {
+      for (var i = 1; i < trail.length; i++) {
+        var p0 = trail[i - 1], p1 = trail[i];
+        var a = i / trail.length;
+        ctx.beginPath();
+        ctx.moveTo(cx + p0.x / G * scale, cy - p0.y / G * scale);
+        ctx.lineTo(cx + p1.x / G * scale, cy - p1.y / G * scale);
+        ctx.strokeStyle = 'rgba(56,198,224,' + (a * 0.5).toFixed(3) + ')';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+
+    // Combined-g readout, in the corner the circle never reaches.
+    var combined = cur ? Math.sqrt(cur.x * cur.x + cur.y * cur.y) / G : 0;
+    ctx.textAlign = 'left';
+    ctx.font = '500 14px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.fillStyle = C.ink;
+    ctx.fillText(combined.toFixed(2) + ' g', 6, 17);
+    ctx.font = '500 8px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.fillStyle = C.dim;
+    ctx.fillText('COMBINED', 6, 28);
+    ctx.font = '500 9px "IBM Plex Mono", ui-monospace, monospace';
+
+    // Current point, coloured by how close it is to a threshold.
+    if (cur) {
+      var gx = cur.x / G, gy = cur.y / G;
+      var mag = Math.sqrt(gx * gx + gy * gy);
+      var col = mag >= ((thresholds && thresholds.harsh) || 0.4) ? C.crit
+        : (mag >= ((thresholds && thresholds.mild) || 0.3) ? C.warn : C.accent);
+      var px = cx + U.clamp(gx, -maxG, maxG) * scale;
+      var py = cy - U.clamp(gy, -maxG, maxG) * scale;
+      ctx.beginPath();
+      ctx.arc(px, py, 13, 0, Math.PI * 2);
+      ctx.fillStyle = col.replace(')', ',0.16)').replace('#', 'rgba(');
+      ctx.fillStyle = hexA(col, 0.18);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = C.ground;
+      ctx.stroke();
+    }
+  }
+
+  function hexA(hex, a) {
+    var h = hex.replace('#', '');
+    var n = parseInt(h, 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+
+  /* --- score ring -------------------------------------------------------- */
+  function scoreRing(canvas, score, tone) {
+    var f = fit(canvas);
+    if (!f.ok) return;
+    var ctx = f.ctx;
+    var cx = f.w / 2, cy = f.h / 2;
+    var R = Math.min(f.w, f.h) / 2 - 10;
+    var col = tone === 'good' ? C.good : (tone === 'warn' ? C.warn : C.crit);
+    var start = -Math.PI / 2;
+    var end = start + Math.PI * 2 * U.clamp(score / 100, 0, 1);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.strokeStyle = C.line;
+    ctx.lineWidth = 8;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, start, end);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
+
+  /* --- route trace ------------------------------------------------------- */
+  function routeMap(canvas, route, events) {
+    var f = fit(canvas);
+    if (!f.ok) return;
+    var ctx = f.ctx;
+    if (!route || route.length < 2) {
+      ctx.fillStyle = C.dim;
+      ctx.font = '12px "IBM Plex Sans", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No position trace for this trip', f.w / 2, f.h / 2);
+      return;
+    }
+    var pad = 16;
+    var minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    route.forEach(function (p) {
+      if (p.lat < minLat) minLat = p.lat; if (p.lat > maxLat) maxLat = p.lat;
+      if (p.lon < minLon) minLon = p.lon; if (p.lon > maxLon) maxLon = p.lon;
+    });
+    // Correct for longitude convergence so the shape is not stretched.
+    var latMid = (minLat + maxLat) / 2;
+    var kx = Math.cos(U.toRad(latMid));
+    var dLat = Math.max(maxLat - minLat, 1e-6);
+    var dLon = Math.max((maxLon - minLon) * kx, 1e-6);
+    var s = Math.min((f.w - pad * 2) / dLon, (f.h - pad * 2) / dLat);
+    var ox = (f.w - dLon * s) / 2, oy = (f.h - dLat * s) / 2;
+    function X(p) { return ox + (p.lon - minLon) * kx * s; }
+    function Y(p) { return f.h - (oy + (p.lat - minLat) * s); }
+
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    route.forEach(function (p, i) { i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p)); });
+    ctx.strokeStyle = C.line2;
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.strokeStyle = C.accent;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Start and end markers
+    ctx.beginPath(); ctx.arc(X(route[0]), Y(route[0]), 4, 0, Math.PI * 2);
+    ctx.fillStyle = C.good; ctx.fill();
+    var last = route[route.length - 1];
+    ctx.beginPath(); ctx.arc(X(last), Y(last), 4, 0, Math.PI * 2);
+    ctx.fillStyle = C.ink; ctx.fill();
+
+    (events || []).forEach(function (e) {
+      if (e.lat == null) return;
+      var p = { lat: e.lat, lon: e.lon };
+      ctx.beginPath();
+      ctx.arc(X(p), Y(p), e.severity === 'severe' ? 5.5 : 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = TYPE_COLOR[e.type] || C.warn;
+      ctx.fill();
+      ctx.strokeStyle = C.ground; ctx.lineWidth = 1.5; ctx.stroke();
+    });
+  }
+
+  /* --- speed profile ----------------------------------------------------- */
+  /* One measure, one axis. The limit is drawn on the same scale as the speed
+     because it is the same quantity — never a second y-axis. */
+  function speedProfile(canvas, route, events, units, hoverIdx) {
+    var f = fit(canvas);
+    if (!f.ok) return null;
+    var ctx = f.ctx;
+    var padL = 34, padR = 10, padT = 12, padB = 22;
+    var W = f.w - padL - padR, H = f.h - padT - padB;
+    if (!route || route.length < 2 || W <= 10) return null;
+
+    var maxV = 0;
+    route.forEach(function (p) {
+      maxV = Math.max(maxV, U.speedIn(p.v, units), p.lim ? U.speedIn(p.lim, units) : 0);
+    });
+    maxV = Math.max(10, Math.ceil(maxV / 10) * 10 + 5);
+    var tEnd = route[route.length - 1].t || 1;
+    function X(t) { return padL + (t / tEnd) * W; }
+    function Y(v) { return padT + H - (v / maxV) * H; }
+
+    // Recessive grid
+    ctx.strokeStyle = C.line;
+    ctx.lineWidth = 1;
+    ctx.font = '500 9px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.fillStyle = C.dim;
+    ctx.textAlign = 'right';
+    var stepV = maxV > 90 ? 30 : (maxV > 45 ? 20 : 10);
+    for (var v = 0; v <= maxV; v += stepV) {
+      var y = Y(v);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + W, y); ctx.stroke();
+      ctx.fillText(String(v), padL - 6, y + 3);
+    }
+
+    // Limit as a step line: it changes discontinuously at road boundaries.
+    var hasLimit = route.some(function (p) { return p.lim != null; });
+    if (hasLimit) {
+      ctx.beginPath();
+      var started = false, prevY = null;
+      route.forEach(function (p) {
+        if (p.lim == null) { started = false; return; }
+        var y = Y(U.speedIn(p.lim, units)), x = X(p.t);
+        if (!started) { ctx.moveTo(x, y); started = true; }
+        else { ctx.lineTo(x, prevY == null ? y : prevY); ctx.lineTo(x, y); }
+        prevY = y;
+      });
+      ctx.strokeStyle = 'rgba(199,125,255,0.75)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Speed area + line
+    ctx.beginPath();
+    ctx.moveTo(X(route[0].t), Y(0));
+    route.forEach(function (p) { ctx.lineTo(X(p.t), Y(U.speedIn(p.v, units))); });
+    ctx.lineTo(X(route[route.length - 1].t), Y(0));
+    ctx.closePath();
+    var grad = ctx.createLinearGradient(0, padT, 0, padT + H);
+    grad.addColorStop(0, hexA(C.accent, 0.28));
+    grad.addColorStop(1, hexA(C.accent, 0.02));
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    route.forEach(function (p, i) {
+      var x = X(p.t), y = Y(U.speedIn(p.v, units));
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.strokeStyle = C.accent;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Event markers on the baseline, so they never obscure the trace.
+    (events || []).forEach(function (e) {
+      if (e.t0 == null || e.t0 > tEnd) return;
+      var x = X(e.t0);
+      ctx.beginPath();
+      ctx.moveTo(x, padT + H);
+      ctx.lineTo(x, padT + H + 5);
+      ctx.strokeStyle = TYPE_COLOR[e.type] || C.warn;
+      ctx.lineWidth = e.severity === 'severe' ? 2.5 : 1.5;
+      ctx.stroke();
+    });
+
+    // Crosshair for the hovered sample
+    if (hoverIdx != null && route[hoverIdx]) {
+      var hp = route[hoverIdx];
+      var hx = X(hp.t), hy = Y(U.speedIn(hp.v, units));
+      ctx.beginPath();
+      ctx.moveTo(hx, padT); ctx.lineTo(hx, padT + H);
+      ctx.strokeStyle = C.line2; ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = C.ink; ctx.fill();
+      ctx.strokeStyle = C.ground; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = C.dim;
+    ctx.fillText('0:00', padL, padT + H + 15);
+    ctx.textAlign = 'right';
+    ctx.fillText(U.fmtDuration(tEnd), padL + W, padT + H + 15);
+
+    return { padL: padL, W: W, tEnd: tEnd };
+  }
+
+  /* Map a pointer x to the nearest route index. */
+  function indexAtX(route, geom, x) {
+    if (!geom || !route || !route.length) return null;
+    var frac = U.clamp((x - geom.padL) / geom.W, 0, 1);
+    var t = frac * geom.tEnd;
+    var lo = 0, hi = route.length - 1;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (route[mid].t < t) lo = mid + 1; else hi = mid;
+    }
+    return lo;
+  }
+
+  TL.charts = {
+    C: C, TYPE_COLOR: TYPE_COLOR, SEV: SEV, fit: fit, hexA: hexA,
+    gMeter: gMeter, scoreRing: scoreRing, routeMap: routeMap,
+    speedProfile: speedProfile, indexAtX: indexAtX, roundRect: roundRect
+  };
+})(window.TL = window.TL || {});
+
+/* ===== app.js ===== */
+/* Application shell: screens, live loop, rendering, settings. */
+(function (TL) {
+  'use strict';
+  var U = TL.util, CH = TL.charts;
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  var S = {
+    settings: null, trips: [], trip: null, mode: 'idle', player: null,
+    raf: null, trail: [], current: null, viewRecord: null, fromScreen: 'home',
+    lastScoreT: 0, liveScore: null, ticker: [], profileGeom: null,
+    hoverIdx: null, geoError: null, started: 0
+  };
+
+  var TYPE_NAME = { brake: 'Harsh braking', accel: 'Harsh acceleration', corner: 'Sharp cornering', speeding: 'Over the limit' };
+  var LIMITS = { mph: [20, 30, 40, 50, 60, 70], kmh: [30, 50, 60, 80, 100, 120] };
+
+  /* ---------------- screens ---------------- */
+  function showScreen(name) {
+    ['home', 'drive', 'summary', 'history', 'settings'].forEach(function (n) {
+      var s = $('screen-' + n);
+      if (s) s.classList.toggle('is-active', n === name);
+    });
+    var navFor = name === 'summary' ? 'history' : (name === 'drive' ? 'home' : name);
+    Array.prototype.forEach.call(document.querySelectorAll('.nav button'), function (b) {
+      b.classList.toggle('is-on', b.getAttribute('data-nav') === navFor);
+    });
+    window.scrollTo(0, 0);
+    if (name === 'drive') startRenderLoop(); else stopRenderLoop();
+  }
+
+  function setStatus(text, cls) {
+    var d = $('statusDot');
+    d.textContent = text;
+    d.className = 'status-dot ' + (cls || '');
+    var h = $('hudStatus');
+    if (h) { h.textContent = text; h.className = 'status-dot ' + (cls || ''); }
+  }
+
+  /* ---------------- live tracking ---------------- */
+  function startLive() {
+    TL.alerts.unlock();
+    TL.alerts.configure(S.settings);
+    S.geoError = null;
+
+    TL.sensors.requestMotion().then(function (r) {
+      if (r.ok) {
+        TL.sensors.startMotion(function (m) { if (S.trip) S.trip.feedMotion(m); });
+      }
+      beginTrip('live');
+      var ok = TL.sensors.startGeo(function (p) {
+        if (S.trip) S.trip.feedPosition(p);
+        S.geoError = null;
+      }, function (err) {
+        S.geoError = err;
+        setStatus(err.code === 1 ? 'No location' : 'Weak signal', err.code === 1 ? 'is-off' : 'is-warn');
+      });
+      if (!ok) setStatus('No location', 'is-off');
+      if (S.settings.keepAwake) TL.sensors.keepAwake(true);
+    });
+  }
+
+  function beginTrip(mode) {
+    S.mode = mode;
+    S.trip = new TL.Trip({ sensitivity: S.settings.sensitivity });
+    S.trail = []; S.ticker = []; S.current = null; S.liveScore = null;
+    S.lastScoreT = 0; S.started = Date.now();
+    if (mode === 'live') {
+      S.trip.start(Date.now(), Date.now());
+      var lim = S.settings.limitMode === 'manual' && S.settings.defaultLimit
+        ? U.speedFrom(S.settings.defaultLimit, S.settings.units) : null;
+      S.trip.setLimit(lim, lim ? 'manual' : 'none');
+    }
+    renderLimitPicker();
+    renderTicker();
+    updateCounts();
+    setStatus(mode === 'demo' ? 'Demo' : 'Tracking', mode === 'demo' ? 'is-demo' : 'is-live');
+    showScreen('drive');
+    $('btnStop').textContent = mode === 'demo' ? 'Stop demo & score it' : 'End trip & score it';
+    $('limitCard').classList.toggle('hidden', mode === 'demo');
+  }
+
+  function liveTick() {
+    if (S.mode !== 'live' || !S.trip) return;
+    var r = S.trip.tick(Date.now());
+    S.current = r;
+    if (r.events.length) onEvents(r.events);
+  }
+
+  function stopTrip() {
+    if (!S.trip) return;
+    if (S.player) { S.player.stop(); S.player = null; }
+    if (S.mode === 'live') {
+      TL.sensors.stopGeo(); TL.sensors.stopMotion(); TL.sensors.keepAwake(false);
+      S.trip.stop(Date.now());
+    } else {
+      S.trip.stop();
+    }
+    var rec = S.trip.record({ source: S.mode === 'demo' ? 'demo' : 'live', profile: S.demoProfile });
+    var mode = S.mode;
+    S.mode = 'idle'; S.trip = null;
+    setStatus('Idle', '');
+    // A trip with no meaningful movement is noise, not a record.
+    if (rec.acc.distanceM < 40 && rec.acc.movingMs < 15000) {
+      showScreen('home');
+      renderHome();
+      return;
+    }
+    var trips = TL.storage.saveTrip(rec);
+    if (trips) S.trips = trips;
+    S.fromScreen = mode === 'demo' ? 'settings' : 'home';
+    openSummary(rec);
+    renderHome();
+  }
+
+  function onEvents(list) {
+    list.forEach(function (ev) {
+      TL.alerts.fire(ev);
+      flash(ev.severity);
+      S.ticker.unshift(ev);
+    });
+    if (S.ticker.length > 40) S.ticker.length = 40;
+    renderTicker();
+    updateCounts();
+  }
+
+  var flashTimer = null;
+  function flash(sev) {
+    if (sev === 'mild') return;
+    var f = $('flash');
+    f.className = 'flash ' + (sev === 'severe' ? 'f-crit' : 'f-warn') + ' is-on';
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () { f.className = 'flash'; }, 380);
+  }
+
+  /* ---------------- render loop ---------------- */
+  function startRenderLoop() {
+    if (S.raf) return;
+    var loop = function () {
+      S.raf = requestAnimationFrame(loop);
+      if (S.mode === 'live') liveTick();
+      renderHUD();
+    };
+    S.raf = requestAnimationFrame(loop);
+  }
+  function stopRenderLoop() {
+    if (S.raf) cancelAnimationFrame(S.raf);
+    S.raf = null;
+  }
+
+  function renderHUD() {
+    var r = S.current;
+    var units = S.settings.units;
+    var s = r ? r.sample : null;
+
+    if (s) {
+      S.trail.push({ x: s.aLat, y: s.aLong });
+      if (S.trail.length > 55) S.trail.shift();
+      var spd = U.speedIn(s.speed, units);
+      $('hudSpeed').textContent = Math.round(spd);
+      var lim = S.trip ? S.trip.limit : null;
+      $('hudSpeed').classList.toggle('is-over', !!lim && s.speed > lim * 1.05 + 0.45);
+      $('hudTime').textContent = U.fmtDuration(S.trip ? S.trip.acc.totalMs : 0);
+      $('hudDist').textContent = U.fmtDist(s.distance, units);
+      $('hudAcc').textContent = s.accuracy != null ? Math.round(s.accuracy) + ' m' : '--';
+      updateLimitSign();
+    }
+    $('hudSpeedUnit').textContent = U.speedUnit(units).toUpperCase();
+
+    var th = TL.detectorThresholds(S.settings.sensitivity);
+    CH.gMeter($('gMeter'), s ? { x: s.aLat, y: s.aLong } : null, S.trail, {
+      mild: th.brake.mild / U.G, harsh: th.brake.harsh / U.G, severe: th.brake.severe / U.G
+    });
+
+    var now = Date.now();
+    if (S.trip && now - S.lastScoreT > 1500) {
+      S.lastScoreT = now;
+      var acc = S.trip.summary();
+      S.liveScore = TL.scoring.scoreTrip(acc);
+      var enough = acc.movingMs > 20000;
+      $('liveScore').textContent = enough ? S.liveScore.overall : '--';
+      $('liveScore').style.color = enough ? toneColor(S.liveScore.band.tone) : 'var(--dim)';
+      $('liveBand').textContent = enough ? S.liveScore.band.label : 'Gathering data';
+      CH.scoreRing($('liveRing'), enough ? S.liveScore.overall : 0, enough ? S.liveScore.band.tone : 'good');
+    }
+  }
+
+  function toneColor(t) {
+    return t === 'good' ? 'var(--good)' : (t === 'warn' ? 'var(--warn)' : 'var(--crit)');
+  }
+
+  function updateCounts() {
+    if (!S.trip) return;
+    var c = { brake: 0, accel: 0, corner: 0, speeding: 0 };
+    S.trip.acc.events.forEach(function (e) { c[e.type] = (c[e.type] || 0) + 1; });
+    $('cntBrake').textContent = c.brake;
+    $('cntAccel').textContent = c.accel;
+    $('cntCorner').textContent = c.corner;
+    $('cntSpeed').textContent = c.speeding;
+    $('evCount').textContent = S.trip.acc.events.length + ' total';
+  }
+
+  function updateLimitSign() {
+    var sign = $('hudLimit');
+    var lim = S.trip ? S.trip.limit : null;
+    if (lim) {
+      sign.classList.remove('is-unset');
+      sign.textContent = Math.round(U.speedIn(lim, S.settings.units));
+    } else {
+      sign.classList.add('is-unset');
+      sign.textContent = S.mode === 'demo' ? 'AUTO' : 'SET';
+    }
+  }
+
+  function renderLimitPicker() {
+    var box = $('limitPicker');
+    box.innerHTML = '';
+    var units = S.settings.units;
+    var vals = LIMITS[units] || LIMITS.mph;
+    var cur = S.trip && S.trip.limit ? Math.round(U.speedIn(S.trip.limit, units)) : null;
+    vals.forEach(function (v) {
+      var b = el('button', 'limit-btn' + (cur === v ? ' is-on' : ''), String(v));
+      b.type = 'button';
+      b.addEventListener('click', function () {
+        if (S.trip) S.trip.setLimit(U.speedFrom(v, units), 'manual');
+        S.settings.defaultLimit = v;
+        TL.storage.saveSettings(S.settings);
+        renderLimitPicker(); updateLimitSign();
+      });
+      box.appendChild(b);
+    });
+    var off = el('button', 'limit-btn' + (cur == null ? ' is-on' : ''), 'off');
+    off.type = 'button';
+    off.addEventListener('click', function () {
+      if (S.trip) S.trip.setLimit(null, 'none');
+      renderLimitPicker(); updateLimitSign();
+    });
+    box.appendChild(off);
+  }
+
+  function renderTicker() {
+    var box = $('ticker');
+    box.innerHTML = '';
+    if (!S.ticker.length) {
+      box.appendChild(el('div', 'ticker-empty', 'Nothing flagged yet.'));
+      return;
+    }
+    S.ticker.slice(0, 12).forEach(function (ev) { box.appendChild(eventRow(ev)); });
+  }
+
+  function eventRow(ev) {
+    var row = el('div', 'ev t-' + ev.type);
+    row.appendChild(el('span', 'sev-tag sev-' + ev.severity, ev.severity));
+    row.appendChild(el('span', 'ev-name', TYPE_NAME[ev.type] || ev.type));
+    var val = ev.type === 'speeding'
+      ? Math.round(U.speedIn(ev.peak, S.settings.units)) + ' in ' + Math.round(U.speedIn(ev.limit, S.settings.units))
+      : ev.peakG.toFixed(2) + ' g' + (ev.dir ? ' ' + ev.dir : '');
+    row.appendChild(el('span', 'ev-val', val));
+    row.appendChild(el('span', 'ev-time', U.fmtDuration(ev.t0 - (S.trip ? S.trip.t0 : 0))));
+    return row;
+  }
+
+  /* ---------------- demo ---------------- */
+  function runDemo(profileKey) {
+    TL.alerts.unlock();
+    TL.alerts.configure(S.settings);
+    S.demoProfile = profileKey;
+    var drive = TL.simulate.generate(profileKey, Math.floor(Math.random() * 1e6));
+    var rate = Number(S.settings.demoRate);
+
+    if (!rate) {
+      var t = new TL.Trip({ sensitivity: S.settings.sensitivity });
+      new TL.simulate.Player(t, drive, {}).runInstant();
+      var rec = t.record({ source: 'demo', profile: profileKey });
+      var trips = TL.storage.saveTrip(rec);
+      if (trips) S.trips = trips;
+      S.fromScreen = 'settings';
+      openSummary(rec);
+      renderHome();
+      return;
+    }
+
+    beginTrip('demo');
+    S.player = new TL.simulate.Player(S.trip, drive, {
+      rate: rate,
+      onTick: function (r) { S.current = r; },
+      onEvent: function (evs) { onEvents(evs); },
+      onDone: function () { S.player = null; stopTrip(); }
+    });
+    S.player.start();
+  }
+
+  function compareProfiles() {
+    var host = $('demoCompare');
+    if (!host) {
+      host = el('div', 'card');
+      host.id = 'demoCompare';
+      $('btnDemoAll').parentNode.parentNode.appendChild(host);
+    }
+    host.innerHTML = '';
+    var head = el('div', 'card-head');
+    head.appendChild(el('span', 'card-title', 'Same route, three drivers'));
+    host.appendChild(head);
+    host.appendChild(el('p', 'fine', 'Each is scored instantly on an identical road plan, so the only difference is how it was driven.'));
+    var seed = Math.floor(Math.random() * 1e6);
+    var list = el('div', 'triplist');
+    list.style.marginTop = '12px';
+    ['smooth', 'average', 'aggressive'].forEach(function (k) {
+      var t = new TL.Trip({ sensitivity: S.settings.sensitivity });
+      new TL.simulate.Player(t, TL.simulate.generate(k, seed), {}).runInstant();
+      var acc = t.summary(), sc = TL.scoring.scoreTrip(acc);
+      var c = { brake: 0, accel: 0, corner: 0, speeding: 0 };
+      acc.events.forEach(function (e) { c[e.type] = (c[e.type] || 0) + 1; });
+      var row = el('div', 'trip-row');
+      row.style.cursor = 'default';
+      var sn = el('div', 'trip-score tone-' + sc.band.tone, String(sc.overall));
+      row.appendChild(sn);
+      var main = el('div', 'trip-main');
+      main.appendChild(el('div', 'trip-when', TL.simulate.PROFILES[k].label + ' — ' + sc.band.label));
+      main.appendChild(el('div', 'trip-sub',
+        c.brake + ' brake · ' + c.accel + ' accel · ' + c.corner + ' corner · ' + c.speeding + ' speeding'));
+      row.appendChild(main);
+      row.appendChild(el('div', 'trip-sub', U.fmtDist(acc.distanceM, S.settings.units)));
+      list.appendChild(row);
+    });
+    host.appendChild(list);
+    host.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  /* ---------------- summary ---------------- */
+  function openSummary(rec) {
+    S.viewRecord = rec;
+    S.hoverIdx = null;
+    showScreen('summary');
+    renderSummary(rec);
+  }
+
+  function renderSummary(rec) {
+    var units = S.settings.units;
+    var acc = rec.acc;
+    var sc = TL.scoring.scoreTrip(acc);
+
+    $('sumWhen').textContent = U.fmtDate(rec.startedAt) + ', ' + U.fmtClock(rec.startedAt);
+    $('sumDemoTag').classList.toggle('hidden', rec.source !== 'demo');
+    if (rec.source === 'demo') {
+      $('sumDemoTag').textContent = 'Demo · ' + (TL.simulate.PROFILES[rec.profile] ? TL.simulate.PROFILES[rec.profile].label : 'sim');
+    }
+    $('sumScore').textContent = sc.overall;
+    $('sumScore').style.color = toneColor(sc.band.tone);
+    $('sumBand').textContent = sc.band.label;
+    $('sumBand').className = 'band tone-' + sc.band.tone;
+    CH.scoreRing($('sumRing'), sc.overall, sc.band.tone);
+
+    var q = rec.quality || {};
+    var qbits = [];
+    qbits.push(q.hasMotion ? (q.hasGyro ? 'GPS + accelerometer + gyro' : 'GPS + accelerometer') : 'GPS only');
+    if (q.calConf != null && q.hasMotion) qbits.push('axis calibration ' + Math.round(q.calConf * 100) + '%');
+    if (!sc.speedMeasured) qbits.push('no speed limit set');
+    $('sumSub').textContent = qbits.join(' · ');
+
+    var prov = $('sumProvisional');
+    if (sc.provisional) {
+      prov.classList.remove('hidden');
+      prov.textContent = 'Short trip. Rates per 100 km computed over this little distance are unstable, so treat this score as indicative only.';
+    } else prov.classList.add('hidden');
+
+    var stats = $('sumStats');
+    stats.innerHTML = '';
+    [['Distance', U.fmtDist(acc.distanceM, units), ''],
+     ['Moving time', U.fmtDuration(acc.movingMs), ''],
+     ['Average', Math.round(U.speedIn(acc.avgSpeed, units)), U.speedUnit(units)],
+     ['Top speed', Math.round(U.speedIn(acc.maxSpeed, units)), U.speedUnit(units)]
+    ].forEach(function (s) {
+      var d = el('div', 'stat');
+      d.appendChild(el('div', 'stat-label', s[0]));
+      var v = el('div', 'stat-value');
+      v.appendChild(document.createTextNode(s[1]));
+      if (s[2]) { var sm = el('small', null, ' ' + s[2]); v.appendChild(sm); }
+      d.appendChild(v);
+      stats.appendChild(d);
+    });
+
+    renderComps($('sumComps'), sc, units);
+    $('sumAdvice').textContent = TL.scoring.advice(sc.biggestLoss);
+
+    var evs = acc.events.slice().sort(function (a, b) { return a.t0 - b.t0; });
+    $('sumEvCount').textContent = evs.length ? evs.length + ' events' : 'clean';
+    var box = $('sumEvents');
+    box.innerHTML = '';
+    if (!evs.length) box.appendChild(el('div', 'ticker-empty', 'No events were flagged on this trip.'));
+    evs.forEach(function (ev) {
+      var row = el('div', 'ev t-' + ev.type);
+      row.appendChild(el('span', 'sev-tag sev-' + ev.severity, ev.severity));
+      row.appendChild(el('span', 'ev-name', TYPE_NAME[ev.type] || ev.type));
+      var val = ev.type === 'speeding'
+        ? Math.round(U.speedIn(ev.peak, units)) + ' in ' + Math.round(U.speedIn(ev.limit, units)) + ' · ' + U.fmtDuration(ev.durMs)
+        : ev.peakG.toFixed(2) + ' g' + (ev.dir ? ' ' + ev.dir : '');
+      row.appendChild(el('span', 'ev-val', val));
+      row.appendChild(el('span', 'ev-time', U.fmtDuration(ev.t0)));
+      box.appendChild(row);
+    });
+
+    drawSummaryCharts(rec);
+  }
+
+  function drawSummaryCharts(rec) {
+    CH.routeMap($('sumRoute'), rec.route, rec.acc.events);
+    S.profileGeom = CH.speedProfile($('sumProfile'), rec.route, rec.acc.events, S.settings.units, S.hoverIdx);
+  }
+
+  function renderComps(host, sc, units) {
+    host.innerHTML = '';
+    sc.components.forEach(function (c) {
+      var row = el('div', 'comp' + (c.available ? '' : ' is-na'));
+      var name = el('div', 'comp-name');
+      name.appendChild(document.createTextNode(c.label));
+      var detail = '';
+      if (c.key === 'speeding') {
+        detail = c.available ? (c.meanExcess != null ? c.meanExcess.toFixed(1) + '% mean over' : '') : 'no limit set';
+      } else if (c.key === 'smoothness') {
+        detail = c.rate.toFixed(2) + ' m/s³';
+      } else if (c.key === 'focus') {
+        detail = c.count + ' taps';
+      } else if (c.key === 'context') {
+        detail = c.rate > 0.5 ? Math.round(c.rate) + '% at night' : 'daytime';
+      } else {
+        detail = c.count + ' · ' + c.rate.toFixed(1) + '/100km';
+      }
+      name.appendChild(el('small', null, detail));
+      row.appendChild(name);
+      var track = el('div', 'comp-track');
+      var tone = c.score >= 80 ? 'good' : (c.score >= 60 ? 'warn' : 'crit');
+      var fill = el('div', 'comp-fill tone-' + tone);
+      fill.style.width = (c.available ? c.score : 0) + '%';
+      track.appendChild(fill);
+      row.appendChild(track);
+      row.appendChild(el('div', c.available ? 'comp-score' : 'comp-na',
+        c.available ? String(Math.round(c.score)) : 'n/a'));
+      host.appendChild(row);
+    });
+  }
+
+  /* ---------------- history ---------------- */
+  function renderHistory() {
+    var list = $('tripList');
+    list.innerHTML = '';
+    if (!S.trips.length) {
+      var e = el('div', 'empty');
+      e.appendChild(el('div', 'card-title', 'No trips yet'));
+      e.appendChild(el('p', null, 'Record a drive, or run the demo from Setup, and it will appear here.'));
+      list.appendChild(e);
+      $('histAggCard').classList.add('hidden');
+      $('histTools').classList.add('hidden');
+      return;
+    }
+    $('histTools').classList.remove('hidden');
+    S.trips.forEach(function (t) {
+      var sc = TL.scoring.scoreTrip(t.acc);
+      var row = el('button', 'trip-row');
+      row.type = 'button';
+      row.appendChild(el('div', 'trip-score tone-' + sc.band.tone, String(sc.overall)));
+      var main = el('div', 'trip-main');
+      var when = el('div', 'trip-when');
+      when.appendChild(document.createTextNode(U.fmtDate(t.startedAt) + ', ' + U.fmtClock(t.startedAt)));
+      if (t.source === 'demo') {
+        var tag = el('span', 'trip-tag', 'demo');
+        tag.style.marginLeft = '7px';
+        when.appendChild(tag);
+      }
+      main.appendChild(when);
+      main.appendChild(el('div', 'trip-sub',
+        U.fmtDist(t.acc.distanceM, S.settings.units) + ' · ' + U.fmtDuration(t.acc.movingMs) +
+        ' · ' + t.acc.events.length + ' events'));
+      row.appendChild(main);
+      row.appendChild(el('div', 'trip-sub', sc.band.label));
+      row.addEventListener('click', function () { S.fromScreen = 'history'; openSummary(t); });
+      list.appendChild(row);
+    });
+
+    var agg = TL.scoring.aggregate(S.trips);
+    if (agg) {
+      $('histAggCard').classList.remove('hidden');
+      $('histScore').textContent = agg.overall;
+      $('histScore').style.color = toneColor(agg.band.tone);
+      $('histBand').textContent = agg.band.label;
+      $('histBand').className = 'band tone-' + agg.band.tone;
+      $('histCount').textContent = agg.trips + (agg.trips === 1 ? ' trip' : ' trips');
+      $('histSub').textContent = U.fmtDist(agg.acc.distanceM, S.settings.units) + ' total · ' +
+        agg.acc.events.length + ' events · exposure-weighted, not an average of trip scores';
+      CH.scoreRing($('histRing'), agg.overall, agg.band.tone);
+      renderComps($('histComps'), agg, S.settings.units);
+    }
+  }
+
+  function renderHome() {
+    S.trips = TL.storage.loadTrips();
+    var agg = S.trips.length ? TL.scoring.aggregate(S.trips) : null;
+    var card = $('cardRolling');
+    if (agg) {
+      card.classList.remove('hidden');
+      $('rollScore').textContent = agg.overall;
+      $('rollScore').style.color = toneColor(agg.band.tone);
+      $('rollBand').textContent = agg.band.label;
+      $('rollBand').className = 'band tone-' + agg.band.tone;
+      $('rollingCount').textContent = agg.trips + (agg.trips === 1 ? ' trip' : ' trips');
+      $('rollSub').textContent = U.fmtDist(agg.acc.distanceM, S.settings.units) + ' across every trip on this device.';
+      CH.scoreRing($('rollRing'), agg.overall, agg.band.tone);
+    } else card.classList.add('hidden');
+  }
+
+  function renderWeights() {
+    var host = $('weightList');
+    host.innerHTML = '';
+    var W = TL.scoring.WEIGHTS, L = TL.scoring.LABELS;
+    Object.keys(W).sort(function (a, b) { return W[b] - W[a]; }).forEach(function (k) {
+      var row = el('div', 'comp');
+      var name = el('div', 'comp-name');
+      name.appendChild(document.createTextNode(L[k]));
+      name.appendChild(el('small', null, Math.round(W[k] * 100) + '% of the score'));
+      row.appendChild(name);
+      var track = el('div', 'comp-track');
+      var fill = el('div', 'comp-fill tone-good');
+      fill.style.width = (W[k] / 0.25 * 100) + '%';
+      fill.style.background = 'var(--accent)';
+      track.appendChild(fill);
+      row.appendChild(track);
+      row.appendChild(el('div', 'comp-score', Math.round(W[k] * 100) + '%'));
+      host.appendChild(row);
+    });
+  }
+
+  /* ---------------- settings ---------------- */
+  var SENS_TEXT = {
+    lenient: 'Lenient — harsh braking flags around 0.47 g',
+    standard: 'Standard — harsh braking flags around 0.40 g',
+    strict: 'Strict — harsh braking flags around 0.34 g'
+  };
+
+  function renderSettings() {
+    var s = S.settings;
+    segSet('segUnits', s.units);
+    segSet('segSens', s.sensitivity);
+    segSet('segRate', String(s.demoRate));
+    $('sensDesc').textContent = SENS_TEXT[s.sensitivity];
+    $('swVoice').checked = !!s.voice;
+    $('swBeeps').checked = !!s.beeps;
+    $('swVibrate').checked = !!s.vibrate;
+    $('swAwake').checked = !!s.keepAwake;
+
+    var host = $('profileList');
+    host.innerHTML = '';
+    Object.keys(TL.simulate.PROFILES).forEach(function (k) {
+      var p = TL.simulate.PROFILES[k];
+      var b = el('button', 'profile-btn' + (s.demoProfile === k ? ' is-on' : ''));
+      b.type = 'button';
+      b.appendChild(el('span', 'profile-key', p.label));
+      var t = el('span');
+      t.appendChild(el('span', 't', p.label + ' driver'));
+      t.appendChild(el('span', 'd', p.blurb));
+      b.appendChild(t);
+      b.addEventListener('click', function () {
+        s.demoProfile = k;
+        TL.storage.saveSettings(s);
+        renderSettings();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  function segSet(id, val) {
+    Array.prototype.forEach.call($(id).querySelectorAll('button'), function (b) {
+      b.classList.toggle('is-on', b.getAttribute('data-v') === String(val));
+    });
+  }
+  function segBind(id, handler) {
+    $(id).addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      handler(b.getAttribute('data-v'));
+    });
+  }
+
+  /* ---------------- diagnostics ---------------- */
+  function runDiagnostics() {
+    var host = $('diagList');
+    host.innerHTML = '';
+    host.appendChild(diagRow('Checking sensors', 'this can take a few seconds outdoors', 'Working', 'v-idle'));
+    $('diagNotes').innerHTML = '';
+
+    TL.sensors.probe().then(function (r) {
+      host.innerHTML = '';
+      var st = r.statics;
+      host.appendChild(diagRow('Secure origin', st.protocol + '//', st.secure ? 'Yes' : 'No', st.secure ? 'v-ok' : 'v-no'));
+      host.appendChild(diagRow('Location', r.geo.ok ? 'fix accurate to ' + Math.round(r.geo.accuracy) + ' m' : 'no fix',
+        r.geo.ok ? 'Working' : 'Blocked', r.geo.ok ? 'v-ok' : 'v-no'));
+      if (r.geo.ok) {
+        host.appendChild(diagRow('Speed from GPS', r.geo.hasSpeed ? 'reported directly by the receiver' : 'will be derived from position changes',
+          r.geo.hasSpeed ? 'Native' : 'Derived', r.geo.hasSpeed ? 'v-ok' : 'v-warn'));
+      }
+      host.appendChild(diagRow('Accelerometer', r.motion.ok ? 'motion events arriving' : 'no events',
+        r.motion.ok ? 'Working' : 'Blocked', r.motion.ok ? 'v-ok' : 'v-no'));
+      host.appendChild(diagRow('Gyroscope', r.motion.gyro ? 'used for lateral g' : 'falls back to GPS heading',
+        r.motion.gyro ? 'Working' : 'Absent', r.motion.gyro ? 'v-ok' : 'v-warn'));
+      host.appendChild(diagRow('Keep screen awake', st.wakeLockApi ? 'supported' : 'not supported — set your screen timeout longer',
+        st.wakeLockApi ? 'Yes' : 'No', st.wakeLockApi ? 'v-ok' : 'v-warn'));
+      host.appendChild(diagRow('Saving trips', st.storage ? 'local storage available' : 'local storage blocked — trips will not persist',
+        st.storage ? 'Yes' : 'No', st.storage ? 'v-ok' : 'v-no'));
+      if (st.iframe) {
+        host.appendChild(diagRow('Embedded page', 'running inside a frame', 'Yes', 'v-warn'));
+      }
+
+      var notes = $('diagNotes');
+      var canTrack = r.geo.ok;
+      if (!canTrack) {
+        notes.appendChild(note('warn',
+          '<strong>Live tracking will not work here.</strong> ' + (r.geo.reason || '') +
+          ' The demo drive still works fully &mdash; it needs no sensors at all.'));
+      } else if (!r.motion.ok) {
+        notes.appendChild(note('warn',
+          '<strong>Running on GPS alone.</strong> ' + (r.motion.reason || '') +
+          ' Speeding and cornering still score; braking and acceleration are measured from GPS speed changes, so brief events may be softened.'));
+      } else {
+        notes.appendChild(note('', '<strong>Everything needed is working.</strong> Mount the phone somewhere fixed, start a trip before you pull away, and leave the screen on.'));
+      }
+      S.diag = r;
+    });
+  }
+
+  function diagRow(k, sub, v, cls) {
+    var row = el('div', 'diag-row');
+    var kd = el('div', 'k');
+    kd.appendChild(document.createTextNode(k));
+    if (sub) kd.appendChild(el('small', null, sub));
+    row.appendChild(kd);
+    row.appendChild(el('div', 'v ' + cls, v));
+    return row;
+  }
+  function note(kind, html) {
+    var n = el('div', 'note' + (kind ? ' ' + kind : ''));
+    n.innerHTML = html;
+    return n;
+  }
+
+  /* ---------------- export ---------------- */
+  function stamp(rec) {
+    return new Date(rec.startedAt).toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  }
+  function exportGpx() {
+    var r = S.viewRecord; if (!r) return;
+    TL.exporters.download('drive-' + stamp(r) + '.gpx', TL.exporters.toGPX(r), 'application/gpx+xml');
+  }
+  function exportCsv() {
+    var r = S.viewRecord; if (!r) return;
+    TL.exporters.download('events-' + stamp(r) + '.csv', TL.exporters.eventsCSV([r], S.settings.units), 'text/csv');
+  }
+  function exportJson() {
+    var r = S.viewRecord; if (!r) return;
+    TL.exporters.download('drive-' + stamp(r) + '.json', TL.exporters.tripsJSON([r]), 'application/json');
+  }
+
+  /* ---------------- init ---------------- */
+  function init() {
+    S.settings = TL.storage.loadSettings();
+    S.trips = TL.storage.loadTrips();
+    TL.alerts.configure(S.settings);
+
+    document.querySelector('.nav').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-nav]');
+      if (!b) return;
+      var n = b.getAttribute('data-nav');
+      if (n === 'home') {
+        if (S.mode !== 'idle') showScreen('drive');
+        else { showScreen('home'); renderHome(); }
+      } else if (n === 'history') { showScreen('history'); renderHistory(); }
+      else { showScreen('settings'); renderSettings(); }
+    });
+
+    $('btnStart').addEventListener('click', startLive);
+    $('btnStop').addEventListener('click', stopTrip);
+    $('btnDemoHome').addEventListener('click', function () { runDemo(S.settings.demoProfile || 'average'); });
+    $('btnCheck').addEventListener('click', function () {
+      showScreen('settings'); renderSettings(); runDiagnostics();
+      $('diagList').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    $('btnDemo').addEventListener('click', function () { runDemo(S.settings.demoProfile || 'average'); });
+    $('btnDemoAll').addEventListener('click', compareProfiles);
+    $('btnDiag').addEventListener('click', runDiagnostics);
+
+    $('btnSumBack').addEventListener('click', function () {
+      if (S.fromScreen === 'history') { showScreen('history'); renderHistory(); }
+      else if (S.fromScreen === 'settings') { showScreen('settings'); renderSettings(); }
+      else { showScreen('home'); renderHome(); }
+    });
+    $('btnSumDelete').addEventListener('click', function () {
+      if (!S.viewRecord) return;
+      S.trips = TL.storage.deleteTrip(S.viewRecord.id);
+      S.viewRecord = null;
+      showScreen('history'); renderHome(); renderHistory();
+    });
+    $('btnGpx').addEventListener('click', exportGpx);
+    $('btnCsv').addEventListener('click', exportCsv);
+    $('btnJson').addEventListener('click', exportJson);
+    $('btnCopy').addEventListener('click', function () {
+      if (!S.viewRecord) return;
+      var btn = $('btnCopy');
+      TL.exporters.copy(TL.exporters.tripsJSON([S.viewRecord])).then(function (ok) {
+        btn.textContent = ok ? 'Copied to clipboard' : 'Copy failed — select the text manually';
+        setTimeout(function () { btn.textContent = 'Copy JSON to clipboard'; }, 2200);
+      });
+    });
+    $('btnExportAll').addEventListener('click', function () {
+      TL.exporters.download('all-trips-' + new Date().toISOString().slice(0, 10) + '.json',
+        TL.exporters.tripsJSON(S.trips), 'application/json');
+    });
+    $('btnClearAll').addEventListener('click', function () {
+      var b = $('btnClearAll');
+      if (b.getAttribute('data-armed') !== '1') {
+        b.setAttribute('data-armed', '1');
+        b.textContent = 'Tap again to confirm';
+        setTimeout(function () {
+          b.removeAttribute('data-armed');
+          b.textContent = 'Delete everything';
+        }, 4000);
+        return;
+      }
+      S.trips = TL.storage.clearTrips();
+      b.removeAttribute('data-armed');
+      b.textContent = 'Delete everything';
+      renderHome(); renderHistory();
+    });
+
+    segBind('segUnits', function (v) {
+      S.settings.units = v; TL.storage.saveSettings(S.settings);
+      renderSettings(); renderHome(); renderLimitPicker();
+      if (S.viewRecord) renderSummary(S.viewRecord);
+    });
+    segBind('segSens', function (v) {
+      S.settings.sensitivity = v; TL.storage.saveSettings(S.settings);
+      if (S.trip) S.trip.setSensitivity(v);
+      renderSettings();
+    });
+    segBind('segRate', function (v) {
+      S.settings.demoRate = Number(v); TL.storage.saveSettings(S.settings);
+      renderSettings();
+    });
+    [['swVoice', 'voice'], ['swBeeps', 'beeps'], ['swVibrate', 'vibrate'], ['swAwake', 'keepAwake']]
+      .forEach(function (p) {
+        $(p[0]).addEventListener('change', function () {
+          S.settings[p[1]] = $(p[0]).checked;
+          TL.storage.saveSettings(S.settings);
+          TL.alerts.configure(S.settings);
+          if (p[1] === 'keepAwake' && S.mode === 'live') TL.sensors.keepAwake($(p[0]).checked);
+        });
+      });
+    $('btnTestAlert').addEventListener('click', function () {
+      TL.alerts.unlock();
+      TL.alerts.configure(S.settings);
+      TL.alerts.preview('brake', 'harsh');
+      flash('harsh');
+    });
+
+    // Count screen taps while moving, but not the limit picker: the app
+    // requires those, so charging the driver for them would be unfair.
+    $('screen-drive').addEventListener('pointerdown', function (e) {
+      if (!S.trip || S.mode !== 'live') return;
+      if (e.target.closest('#limitCard') || e.target.closest('#btnStop')) return;
+      S.trip.noteInteraction();
+    });
+
+    // Speed profile hover
+    var pc = $('sumProfile');
+    pc.addEventListener('pointermove', function (e) {
+      if (!S.viewRecord || !S.profileGeom) return;
+      var rect = pc.getBoundingClientRect();
+      var idx = CH.indexAtX(S.viewRecord.route, S.profileGeom, e.clientX - rect.left);
+      if (idx === S.hoverIdx) return;
+      S.hoverIdx = idx;
+      drawSummaryCharts(S.viewRecord);
+      var p = S.viewRecord.route[idx];
+      var tip = $('profileTip');
+      if (p) {
+        tip.textContent = U.fmtDuration(p.t) + '  ' + Math.round(U.speedIn(p.v, S.settings.units)) +
+          ' ' + U.speedUnit(S.settings.units) + (p.lim ? '  (limit ' + Math.round(U.speedIn(p.lim, S.settings.units)) + ')' : '');
+        tip.classList.add('is-on');
+        var tx = U.clamp(e.clientX - rect.left + 10, 4, rect.width - tip.offsetWidth - 4);
+        tip.style.left = tx + 'px';
+        tip.style.top = '6px';
+      }
+    });
+    pc.addEventListener('pointerleave', function () {
+      S.hoverIdx = null;
+      $('profileTip').classList.remove('is-on');
+      if (S.viewRecord) drawSummaryCharts(S.viewRecord);
+    });
+
+    window.addEventListener('resize', function () {
+      if (S.viewRecord && $('screen-summary').classList.contains('is-active')) drawSummaryCharts(S.viewRecord);
+      renderHome();
+      if ($('screen-history').classList.contains('is-active')) renderHistory();
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (S.mode === 'live' && S.settings.keepAwake) TL.sensors.reacquireWakeLock();
+    });
+    window.addEventListener('beforeunload', function (e) {
+      if (S.mode === 'live') { e.preventDefault(); e.returnValue = ''; }
+    });
+
+    renderWeights();
+    renderHome();
+    renderSettings();
+    showScreen('home');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else init();
+})(window.TL = window.TL || {});
+
+</script>
+</body>
+</html>
