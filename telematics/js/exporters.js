@@ -67,8 +67,42 @@
     }, null, 2);
   }
 
-  /* Some embedded viewers block downloads outright, so always offer the
-     clipboard as a fallback rather than failing silently. */
+  /* Some hosts never grant a page a direct download; they mediate saves
+     through a confirmation instead. Resolve that route once at startup and
+     use it when present, falling back to a plain anchor everywhere else.
+     Either way the clipboard is the last resort, so a button never just
+     does nothing. */
+  var host = null;
+
+  function initHost() {
+    if (!(window.claude && typeof window.claude.use === 'function')) return;
+    try {
+      window.claude.use('downloads').then(function (ns) { host = ns || null; },
+                                          function () { host = null; });
+    } catch (e) { host = null; }
+  }
+
+  function deliver(filename, text, mime) {
+    if (host) {
+      return host.save({ filename: filename, data: text })
+        .then(function () { return { how: 'saved' }; })
+        .catch(function (err) {
+          var code = err && err.code;
+          if (code === 'declined') return { how: 'declined' };
+          if (code === 'rate_limited') return { how: 'busy' };
+          if (code === 'too_large') return { how: 'toobig' };
+          // The host allows only certain file types; GPX is not among them.
+          var why = (code === 'rejected_extension' || code === 'extension_not_enabled')
+            ? 'format' : null;
+          return copy(text).then(function (ok) {
+            return { how: ok ? 'copied' : 'failed', why: why };
+          });
+        });
+    }
+    if (download(filename, text, mime)) return Promise.resolve({ how: 'saved' });
+    return copy(text).then(function (ok) { return { how: ok ? 'copied' : 'failed' }; });
+  }
+
   function download(filename, text, mime) {
     try {
       var blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
@@ -103,6 +137,6 @@
 
   TL.exporters = {
     toGPX: toGPX, eventsCSV: eventsCSV, tripsJSON: tripsJSON,
-    download: download, copy: copy
+    download: download, copy: copy, deliver: deliver, initHost: initHost
   };
 })(window.TL = window.TL || {});

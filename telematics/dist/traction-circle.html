@@ -2920,8 +2920,42 @@ a { color: var(--accent); }
     }, null, 2);
   }
 
-  /* Some embedded viewers block downloads outright, so always offer the
-     clipboard as a fallback rather than failing silently. */
+  /* Some hosts never grant a page a direct download; they mediate saves
+     through a confirmation instead. Resolve that route once at startup and
+     use it when present, falling back to a plain anchor everywhere else.
+     Either way the clipboard is the last resort, so a button never just
+     does nothing. */
+  var host = null;
+
+  function initHost() {
+    if (!(window.claude && typeof window.claude.use === 'function')) return;
+    try {
+      window.claude.use('downloads').then(function (ns) { host = ns || null; },
+                                          function () { host = null; });
+    } catch (e) { host = null; }
+  }
+
+  function deliver(filename, text, mime) {
+    if (host) {
+      return host.save({ filename: filename, data: text })
+        .then(function () { return { how: 'saved' }; })
+        .catch(function (err) {
+          var code = err && err.code;
+          if (code === 'declined') return { how: 'declined' };
+          if (code === 'rate_limited') return { how: 'busy' };
+          if (code === 'too_large') return { how: 'toobig' };
+          // The host allows only certain file types; GPX is not among them.
+          var why = (code === 'rejected_extension' || code === 'extension_not_enabled')
+            ? 'format' : null;
+          return copy(text).then(function (ok) {
+            return { how: ok ? 'copied' : 'failed', why: why };
+          });
+        });
+    }
+    if (download(filename, text, mime)) return Promise.resolve({ how: 'saved' });
+    return copy(text).then(function (ok) { return { how: ok ? 'copied' : 'failed' }; });
+  }
+
   function download(filename, text, mime) {
     try {
       var blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
@@ -2956,7 +2990,7 @@ a { color: var(--accent); }
 
   TL.exporters = {
     toGPX: toGPX, eventsCSV: eventsCSV, tripsJSON: tripsJSON,
-    download: download, copy: copy
+    download: download, copy: copy, deliver: deliver, initHost: initHost
   };
 })(window.TL = window.TL || {});
 
@@ -3970,23 +4004,51 @@ a { color: var(--accent); }
   function stamp(rec) {
     return new Date(rec.startedAt).toISOString().replace(/[:.]/g, '-').slice(0, 19);
   }
+
+  var EXPORT_MSG = {
+    saved: 'Saved',
+    copied: 'Copied to clipboard instead',
+    declined: null,
+    busy: 'Try that again in a moment',
+    toobig: 'Too large to save',
+    failed: 'Could not export'
+  };
+
+  function runExport(btn, filename, text, mime) {
+    var label = btn.getAttribute('data-label') || btn.textContent;
+    btn.setAttribute('data-label', label);
+    btn.disabled = true;
+    TL.exporters.deliver(filename, text, mime).then(function (r) {
+      btn.disabled = false;
+      var msg = r.why === 'format'
+        ? 'Not saveable here — copied instead'
+        : EXPORT_MSG[r.how];
+      if (!msg) return;
+      btn.textContent = msg;
+      setTimeout(function () { btn.textContent = label; }, 2600);
+    });
+  }
+
   function exportGpx() {
     var r = S.viewRecord; if (!r) return;
-    TL.exporters.download('drive-' + stamp(r) + '.gpx', TL.exporters.toGPX(r), 'application/gpx+xml');
+    runExport($('btnGpx'), 'drive-' + stamp(r) + '.gpx', TL.exporters.toGPX(r), 'application/gpx+xml');
   }
   function exportCsv() {
     var r = S.viewRecord; if (!r) return;
-    TL.exporters.download('events-' + stamp(r) + '.csv', TL.exporters.eventsCSV([r], S.settings.units), 'text/csv');
+    runExport($('btnCsv'), 'events-' + stamp(r) + '.csv',
+      TL.exporters.eventsCSV([r], S.settings.units), 'text/csv');
   }
   function exportJson() {
     var r = S.viewRecord; if (!r) return;
-    TL.exporters.download('drive-' + stamp(r) + '.json', TL.exporters.tripsJSON([r]), 'application/json');
+    runExport($('btnJson'), 'drive-' + stamp(r) + '.json',
+      TL.exporters.tripsJSON([r]), 'application/json');
   }
 
   /* ---------------- init ---------------- */
   function init() {
     S.settings = TL.storage.loadSettings();
     S.trips = TL.storage.loadTrips();
+    TL.exporters.initHost();
     TL.alerts.configure(S.settings);
 
     document.querySelector('.nav').addEventListener('click', function (e) {
@@ -4034,7 +4096,7 @@ a { color: var(--accent); }
       });
     });
     $('btnExportAll').addEventListener('click', function () {
-      TL.exporters.download('all-trips-' + new Date().toISOString().slice(0, 10) + '.json',
+      runExport($('btnExportAll'), 'all-trips-' + new Date().toISOString().slice(0, 10) + '.json',
         TL.exporters.tripsJSON(S.trips), 'application/json');
     });
     $('btnClearAll').addEventListener('click', function () {

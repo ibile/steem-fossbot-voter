@@ -650,23 +650,51 @@
   function stamp(rec) {
     return new Date(rec.startedAt).toISOString().replace(/[:.]/g, '-').slice(0, 19);
   }
+
+  var EXPORT_MSG = {
+    saved: 'Saved',
+    copied: 'Copied to clipboard instead',
+    declined: null,
+    busy: 'Try that again in a moment',
+    toobig: 'Too large to save',
+    failed: 'Could not export'
+  };
+
+  function runExport(btn, filename, text, mime) {
+    var label = btn.getAttribute('data-label') || btn.textContent;
+    btn.setAttribute('data-label', label);
+    btn.disabled = true;
+    TL.exporters.deliver(filename, text, mime).then(function (r) {
+      btn.disabled = false;
+      var msg = r.why === 'format'
+        ? 'Not saveable here — copied instead'
+        : EXPORT_MSG[r.how];
+      if (!msg) return;
+      btn.textContent = msg;
+      setTimeout(function () { btn.textContent = label; }, 2600);
+    });
+  }
+
   function exportGpx() {
     var r = S.viewRecord; if (!r) return;
-    TL.exporters.download('drive-' + stamp(r) + '.gpx', TL.exporters.toGPX(r), 'application/gpx+xml');
+    runExport($('btnGpx'), 'drive-' + stamp(r) + '.gpx', TL.exporters.toGPX(r), 'application/gpx+xml');
   }
   function exportCsv() {
     var r = S.viewRecord; if (!r) return;
-    TL.exporters.download('events-' + stamp(r) + '.csv', TL.exporters.eventsCSV([r], S.settings.units), 'text/csv');
+    runExport($('btnCsv'), 'events-' + stamp(r) + '.csv',
+      TL.exporters.eventsCSV([r], S.settings.units), 'text/csv');
   }
   function exportJson() {
     var r = S.viewRecord; if (!r) return;
-    TL.exporters.download('drive-' + stamp(r) + '.json', TL.exporters.tripsJSON([r]), 'application/json');
+    runExport($('btnJson'), 'drive-' + stamp(r) + '.json',
+      TL.exporters.tripsJSON([r]), 'application/json');
   }
 
   /* ---------------- init ---------------- */
   function init() {
     S.settings = TL.storage.loadSettings();
     S.trips = TL.storage.loadTrips();
+    TL.exporters.initHost();
     TL.alerts.configure(S.settings);
 
     document.querySelector('.nav').addEventListener('click', function (e) {
@@ -714,7 +742,7 @@
       });
     });
     $('btnExportAll').addEventListener('click', function () {
-      TL.exporters.download('all-trips-' + new Date().toISOString().slice(0, 10) + '.json',
+      runExport($('btnExportAll'), 'all-trips-' + new Date().toISOString().slice(0, 10) + '.json',
         TL.exporters.tripsJSON(S.trips), 'application/json');
     });
     $('btnClearAll').addEventListener('click', function () {
