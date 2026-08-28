@@ -193,6 +193,16 @@ details.acc .card-bd{padding-top:0}
 .pick > span{display:flex;flex-direction:column;gap:1px;min-width:0}
 .pick .pn{display:block;font-size:13px;font-weight:600;line-height:1.2}
 .pick .pp{display:block;font-size:11px;color:var(--muted);font-family:"IBM Plex Mono",monospace}
+.ents{display:flex;flex-direction:column;gap:6px;margin:0 0 12px}
+.ent{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;border:1px solid var(--hair);background:var(--surface-2);width:100%;text-align:left}
+.ent.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.ent i{font-style:normal;font-family:Archivo,sans-serif;font-weight:700;font-size:12px;color:hsl(var(--h) var(--chip-s) var(--chip-l));background:hsl(var(--h) var(--chip-s) var(--chip-bg-l) / var(--chip-bg-a));padding:3px 7px;border-radius:6px;min-width:38px;text-align:center;flex:none}
+.ent .en{flex:1;font-size:13px;font-weight:600;min-width:0}
+.ent .en small{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+.ent .eh{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ent .ex{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--muted);font-size:15px;flex:none}
+.ent .ex:hover{background:var(--sunken);color:var(--neg)}
+.cell .code.multi{font-size:10.5px;letter-spacing:-.01em;line-height:1.15}
 .stepper{display:flex;align-items:center;gap:0;border:1px solid var(--hair);border-radius:9px;overflow:hidden;background:var(--surface-2)}
 .stepper button{width:40px;height:38px;font-size:18px;color:var(--muted);font-family:"IBM Plex Mono",monospace}
 .stepper button:hover{background:var(--sunken);color:var(--accent)}
@@ -409,7 +419,7 @@ details.acc .card-bd{padding-top:0}
     <div class="card-hd"><h2>Shift types</h2><button class="btn sm ghost" id="addType">+ Add</button></div>
     <div class="card-bd">
       <div class="tlist" id="typeList"></div>
-      <p class="hint" style="margin:11px 0 0"><b>Starts</b> is only used for calendar events &mdash; leave it blank for an all-day entry. <b>Uplift</b> is the extra per hour on top of basic &mdash; your payslip shows these as their own line. <b>Own rate</b> replaces the basic rate entirely. <b>Unpaid</b> just marks the day.</p>
+      <p class="hint" style="margin:11px 0 0"><b>Top-up only</b> is for hours that are already inside another entry and just earn an enhancement &mdash; bank holiday hours inside a night shift, say. They add the extra per hour and nothing else, so the hours are never counted twice. <b>Starts</b> is only used for calendar events &mdash; leave it blank for an all-day entry. <b>Uplift</b> is the extra per hour on top of basic &mdash; your payslip shows these as their own line. <b>Own rate</b> replaces the basic rate entirely. <b>Unpaid</b> just marks the day.</p>
     </div>
   </div>
 
@@ -498,6 +508,7 @@ details.acc .card-bd{padding-top:0}
   <div class="sheet-in">
     <h3 id="sheetTitle">Day</h3>
     <p class="sub" id="sheetSub"></p>
+    <div class="ents" id="sheetEntries"></div>
     <div class="picks" id="picks"></div>
     <div class="field" style="margin-top:12px;border-bottom:none">
       <label for="sheetHours">Hours paid</label>
@@ -509,7 +520,10 @@ details.acc .card-bd{padding-top:0}
     </div>
     <div class="btnrow" style="margin-top:6px">
       <button class="btn primary" id="sheetSave" style="flex:1">Save shift</button>
-      <button class="btn danger" id="sheetClear">Clear day</button>
+      <button class="btn" id="sheetAnother">+ Another</button>
+    </div>
+    <div class="btnrow" style="margin-top:8px">
+      <button class="btn danger ghost" id="sheetClear" style="flex:1">Clear the whole day</button>
     </div>
   </div>
 </div>
@@ -528,7 +542,7 @@ function defaults(){
     settings:{
       baseRate:12.00, holidayRate:12.00,
       payMode:"cutoff", paydayDom:21, payslipDow:3, payslipWeeks:1, cutoffDow:0, paydayFriday:false,
-      payLabel:"payday", rev:3,
+      payLabel:"payday", rev:4,
       periodStart:1,
       taxCode:"1257L", scottish:false,
       niPT:1048, niUEL:4189, niRate:8, niUpperRate:2,
@@ -541,6 +555,8 @@ function defaults(){
       {id:"ot",    code:"OT",  name:"Overtime",      hours:12, mode:"base",   extra:1, rate:0,     start:"07:00", h:30},
       {id:"bh",    code:"BH",  name:"Bank holiday",  hours:12, mode:"base",   extra:1, rate:0,     start:"07:00", h:172},
       {id:"al",    code:"AL",  name:"Holiday",       hours:12, mode:"rate",   extra:0, rate:12.00, start:"",      h:140},
+      {id:"bht",   code:"BHT", name:"Bank holiday hours", hours:4, mode:"topup", extra:1, rate:0,   start:"",      h:172},
+      {id:"ott",   code:"OTT", name:"Overtime hours",   hours:4,  mode:"topup",  extra:1, rate:0,     start:"",      h:30},
       {id:"off",   code:"OFF", name:"Rest day",      hours:0,  mode:"unpaid", extra:0, rate:0,     start:"",      h:220}
     ],
     shifts:{}
@@ -555,7 +571,8 @@ function load(){
     var d = JSON.parse(raw);
     if(d && d.settings && d.types && d.shifts){
       var base = defaults();
-      DB = {settings:Object.assign(base.settings, d.settings), types:d.types, shifts:d.shifts};
+      DB = {settings:Object.assign(base.settings, d.settings), types:d.types,
+            shifts:normaliseShifts(d.shifts)};
       S = DB.settings;
       migrate(d.settings);
     }
@@ -563,15 +580,27 @@ function load(){
 }
 /* rev 3: the payslip is the payslip-day of the week BEFORE payday's week, which
    puts the cut-off on the second Sunday before payday. */
+/* rev 4: a day can hold several entries, and top-up types exist for hours
+   that earn only the enhancement. */
 function migrate(stored){
   /* judge by what was actually saved: the merge above has already filled
      rev in from the defaults, so S.rev is never the old value */
-  if(!stored || stored.rev >= 3) return;
-  var fresh = defaults().settings;
-  S.cutoffDow = fresh.cutoffDow;
-  S.payslipWeeks = fresh.payslipWeeks;
-  S.payLabel = fresh.payLabel;
-  S.rev = 3;
+  var was = (stored && +stored.rev) || 0;
+  if(was >= 4) return;
+  var fresh = defaults();
+  if(was < 3){
+    S.cutoffDow = fresh.settings.cutoffDow;
+    S.payslipWeeks = fresh.settings.payslipWeeks;
+    S.payLabel = fresh.settings.payLabel;
+  }
+  var hasTopup = false, i;
+  for(i=0;i<DB.types.length;i++) if(DB.types[i].mode === "topup") hasTopup = true;
+  if(!hasTopup){
+    for(i=0;i<fresh.types.length;i++){
+      if(fresh.types[i].mode === "topup") DB.types.push(fresh.types[i]);
+    }
+  }
+  S.rev = 4;
   save();
 }
 function save(){
@@ -590,6 +619,27 @@ function hrs(n){ return (Math.round(n*100)/100).toString().replace(/\.00$/,""); 
 function iso(d){
   var m = d.getMonth()+1, day = d.getDate();
   return d.getFullYear() + "-" + (m<10?"0":"") + m + "-" + (day<10?"0":"") + day;
+}
+/* A day holds a list of entries. Older saves held a single {t,h} object,
+   so everything reads through here. */
+function entriesOf(key){
+  var v = DB.shifts[key];
+  if(!v) return [];
+  return Array.isArray(v) ? v : [v];
+}
+function setEntries(key, list){
+  if(!list || !list.length) delete DB.shifts[key];
+  else DB.shifts[key] = list;
+}
+function entryHours(e, t){
+  return (e.h === null || e.h === undefined) ? +t.hours : +e.h;
+}
+function normaliseShifts(shifts){
+  for(var k in shifts){
+    if(!shifts.hasOwnProperty(k)) continue;
+    if(!Array.isArray(shifts[k])) shifts[k] = [shifts[k]];
+  }
+  return shifts;
 }
 function typeById(id){
   for(var i=0;i<DB.types.length;i++) if(DB.types[i].id===id) return DB.types[i];
@@ -672,6 +722,7 @@ function rangeLabel(p){
 function shiftPay(t, h){
   if(t.mode === "unpaid" || h <= 0) return 0;
   if(t.mode === "rate") return h * (+t.rate || 0);
+  if(t.mode === "topup") return h * (+t.extra || 0);   /* basic already counted */
   return h * ((+S.baseRate || 0) + (+t.extra || 0));
 }
 
@@ -736,19 +787,25 @@ function calc(){
   var uplift = {}, rated = {};
 
   for(var i=0;i<days.length;i++){
-    var rec = DB.shifts[iso(days[i])];
-    if(!rec) continue;
-    var t = typeById(rec.t); if(!t) continue;
-    var h = (rec.h === null || rec.h === undefined) ? +t.hours : +rec.h;
-    if(t.mode === "unpaid" || !(h > 0)) continue;
-    shifts++; totalHours += h;
-    if(t.mode === "rate"){
-      rated[t.id] = (rated[t.id] || 0) + h;
-    } else {
-      baseHours += h;
-      if(+t.extra > 0) uplift[t.id] = (uplift[t.id] || 0) + h;
+    var ents = entriesOf(iso(days[i]));
+    for(var e=0;e<ents.length;e++){
+      var t = typeById(ents[e].t); if(!t) continue;
+      var h = entryHours(ents[e], t);
+      if(t.mode === "unpaid" || !(h > 0)) continue;
+      if(t.mode === "topup"){
+        /* these hours are already inside a shift above - only the extra is due,
+           so they add no basic pay, no worked hours and no shift count */
+        uplift[t.id] = (uplift[t.id] || 0) + h;
+      } else if(t.mode === "rate"){
+        shifts++; totalHours += h;
+        rated[t.id] = (rated[t.id] || 0) + h;
+      } else {
+        shifts++; totalHours += h;
+        baseHours += h;
+        if(+t.extra > 0) uplift[t.id] = (uplift[t.id] || 0) + h;
+      }
+      if(days[i] < today){ soFarGross += shiftPay(t, h); if(t.mode !== "topup") soFarShifts++; }
     }
-    if(days[i] < today){ soFarGross += shiftPay(t, h); soFarShifts++; }
   }
 
   var lines = [];
@@ -759,7 +816,8 @@ function calc(){
   }
   for(var uid in uplift){ if(!uplift.hasOwnProperty(uid)) continue;
     var ut = typeById(uid);
-    lines.push({name:ut.name + " uplift", hours:uplift[uid], rate:+ut.extra, amount:r2(uplift[uid] * (+ut.extra||0))});
+    lines.push({name:ut.mode === "topup" ? ut.name : ut.name + " uplift",
+                hours:uplift[uid], rate:+ut.extra, amount:r2(uplift[uid] * (+ut.extra||0))});
   }
   var gross = 0;
   for(var k=0;k<lines.length;k++) gross += lines[k].amount;
@@ -837,17 +895,30 @@ function renderGrid(p){
   for(var b=0;b<lead;b++) html += '<div class="cell blank"></div>';
   var days = eachDay(p), now = new Date(); now.setHours(0,0,0,0);
   for(var i=0;i<days.length;i++){
-    var d = days[i], key = iso(d), rec = DB.shifts[key], t = rec ? typeById(rec.t) : null;
+    var d = days[i], key = iso(d), ents = entriesOf(key);
     var cls = "cell", hue = 220, inner = "";
     if(key === today) cls += " today";
     else if(d < now) cls += " past";
     if(S.payMode === "cutoff" && i === days.length - 1) cls += " cutoff";
-    if(t){
-      cls += " filled"; hue = t.h;
-      if(t.mode === "unpaid") cls += " unpaid";
-      var h = (rec.h === null || rec.h === undefined) ? +t.hours : +rec.h;
-      inner = '<span class="code">' + esc(t.code) + '</span>' +
-              (t.mode === "unpaid" || !(h>0) ? "" : '<span class="hrs">' + hrs(h) + '</span>');
+    if(ents.length){
+      var codes = [], worked = 0, topup = 0, lead = null, allUnpaid = true;
+      for(var e=0;e<ents.length;e++){
+        var t = typeById(ents[e].t); if(!t) continue;
+        var h = entryHours(ents[e], t);
+        codes.push(esc(t.code));
+        if(!lead) lead = t;
+        if(t.mode !== "unpaid") allUnpaid = false;
+        if(t.mode === "topup") topup += h;
+        else if(t.mode !== "unpaid") worked += h;
+      }
+      if(lead){
+        cls += " filled"; hue = lead.h;
+        if(allUnpaid) cls += " unpaid";
+        var show = worked || topup;
+        var label = codes.length <= 2 ? codes.join(" ") : codes[0] + " +" + (codes.length - 1);
+        inner = '<span class="code' + (codes.length > 1 ? " multi" : "") + '">' + label + '</span>' +
+                (show > 0 ? '<span class="hrs">' + hrs(show) + '</span>' : "");
+      }
     }
     html += '<button class="' + cls + '" style="--h:' + hue + '" data-key="' + key + '" aria-label="' +
             DAYS[d.getDay()] + " " + d.getDate() + " " + MON[d.getMonth()] + '">' +
@@ -933,7 +1004,7 @@ $("clearMonth").addEventListener("click", function(){
 });
 
 /* ---------------- day sheet ---------------- */
-var sheetKey = null, sheetType = null;
+var sheetKey = null, sheetType = null, editIndex = -1;
 
 $("grid").addEventListener("click", function(e){
   var btn = e.target.closest ? e.target.closest(".cell") : null;
@@ -942,20 +1013,60 @@ $("grid").addEventListener("click", function(e){
 });
 
 function openSheet(key){
-  sheetKey = key;
+  sheetKey = key; editIndex = -1;
   var parts = key.split("-"), d = new Date(+parts[0], +parts[1]-1, +parts[2]);
-  var rec = DB.shifts[key];
-  sheetType = rec ? rec.t : null;
   $("sheetTitle").textContent = DAYS[d.getDay()] + " " + d.getDate() + " " + MONTHS[d.getMonth()];
-  $("sheetSub").textContent = rec ? "Tap a type to change it" : "What are you working?";
-  var startType = sheetType || DB.types[0].id;
-  if(!sheetType) sheetType = startType;
+  sheetType = DB.types[0].id;
   var t = typeById(sheetType);
-  $("sheetHours").value = rec && rec.h != null ? rec.h : (t ? t.hours : 12);
-  renderPicks();
+  $("sheetHours").value = t ? t.hours : 12;
+  renderSheet();
   $("scrim").classList.add("on");
   $("sheet").classList.add("on");
 }
+function renderSheet(){
+  var ents = entriesOf(sheetKey);
+  $("sheetSub").textContent = !ents.length ? "What are you working?"
+    : editIndex >= 0 ? "Changing entry " + (editIndex + 1) + " - pick a type and hours"
+    : ents.length + (ents.length === 1 ? " entry so far" : " entries so far") + " - tap one to change it";
+  $("sheetSave").textContent = editIndex >= 0 ? "Update entry" : ents.length ? "Add to this day" : "Save shift";
+  $("sheetAnother").hidden = editIndex >= 0;
+  renderEntryList(ents);
+  renderPicks();
+}
+function renderEntryList(ents){
+  var html = "";
+  for(var i=0;i<ents.length;i++){
+    var t = typeById(ents[i].t);
+    if(!t){ continue; }
+    var h = entryHours(ents[i], t);
+    var note = t.mode === "topup" ? "enhancement only" : t.mode === "unpaid" ? "unpaid"
+             : t.mode === "rate" ? money(t.rate) + "/hr" : money((+S.baseRate) + (+t.extra || 0)) + "/hr";
+    html += '<div class="ent' + (i === editIndex ? " sel" : "") + '" style="--h:' + t.h + '">' +
+            '<button class="ent-pick" data-i="' + i + '" style="display:flex;align-items:center;gap:9px;flex:1;min-width:0;text-align:left">' +
+            '<i>' + esc(t.code) + '</i><span class="en">' + esc(t.name) + '<small>' + note + '</small></span>' +
+            '<span class="eh">' + (t.mode === "unpaid" ? "" : hrs(h) + " h") + '</span></button>' +
+            '<button class="ex" data-del="' + i + '" aria-label="Remove ' + esc(t.name) + '">&times;</button></div>';
+  }
+  $("sheetEntries").innerHTML = html;
+}
+$("sheetEntries").addEventListener("click", function(ev){
+  var del = ev.target.closest ? ev.target.closest("[data-del]") : null;
+  if(del){
+    var list = entriesOf(sheetKey).slice();
+    list.splice(+del.dataset.del, 1);
+    setEntries(sheetKey, list);
+    if(editIndex >= list.length) editIndex = -1;
+    save(); renderSheet(); render();
+    return;
+  }
+  var pick = ev.target.closest ? ev.target.closest("[data-i]") : null;
+  if(!pick) return;
+  editIndex = +pick.dataset.i;
+  var ent = entriesOf(sheetKey)[editIndex], t = typeById(ent.t);
+  sheetType = ent.t;
+  $("sheetHours").value = entryHours(ent, t);
+  renderSheet();
+});
 function closeSheet(){
   $("scrim").classList.remove("on");
   $("sheet").classList.remove("on");
@@ -966,6 +1077,7 @@ function renderPicks(){
   for(var i=0;i<DB.types.length;i++){
     var t = DB.types[i], on = t.id === sheetType;
     var pay = t.mode === "unpaid" ? "unpaid"
+            : t.mode === "topup" ? "+" + money(t.extra) + "/hr on top"
             : t.mode === "rate" ? money(t.rate) + "/hr"
             : (+t.extra > 0 ? money((+S.baseRate) + (+t.extra)) + "/hr" : money(+S.baseRate) + "/hr");
     html += '<button class="pick' + (t.mode==="unpaid"?" unpaid":"") + '" style="--h:' + t.h + '" data-id="' + t.id + '" aria-pressed="' + (on?"true":"false") + '">' +
@@ -981,6 +1093,8 @@ $("picks").addEventListener("click", function(e){
   var t = typeById(sheetType);
   if(t) $("sheetHours").value = t.hours;
   renderPicks();
+  $("sheetSave").textContent = editIndex >= 0 ? "Update entry" :
+    entriesOf(sheetKey).length ? "Add to this day" : "Save shift";
 });
 $("hMinus").addEventListener("click", function(){
   var v = parseFloat($("sheetHours").value) || 0;
@@ -990,15 +1104,30 @@ $("hPlus").addEventListener("click", function(){
   var v = parseFloat($("sheetHours").value) || 0;
   $("sheetHours").value = r2(v + 0.5);
 });
-$("sheetSave").addEventListener("click", function(){
-  if(!sheetKey) return;
+function commitEntry(){
+  if(!sheetKey) return false;
   var h = parseFloat($("sheetHours").value);
   if(isNaN(h) || h < 0) h = 0;
-  DB.shifts[sheetKey] = {t:sheetType, h:h};
-  save(); closeSheet(); render();
+  var list = entriesOf(sheetKey).slice();
+  if(editIndex >= 0 && editIndex < list.length) list[editIndex] = {t:sheetType, h:h};
+  else list.push({t:sheetType, h:h});
+  setEntries(sheetKey, list);
+  editIndex = -1;
+  save(); render();
+  return true;
+}
+$("sheetSave").addEventListener("click", function(){
+  if(commitEntry()) closeSheet();
+});
+$("sheetAnother").addEventListener("click", function(){
+  if(!commitEntry()) return;
+  var t = typeById(sheetType);
+  if(t) $("sheetHours").value = t.hours;
+  renderSheet();
 });
 $("sheetClear").addEventListener("click", function(){
   if(sheetKey) delete DB.shifts[sheetKey];
+  editIndex = -1;
   save(); closeSheet(); render();
 });
 $("scrim").addEventListener("click", closeSheet);
@@ -1091,7 +1220,17 @@ function hoursFromRange(txt){
 
 function parseRota(text){
   var ix = codeIndex(), p = period(), days = eachDay(p);
-  var lines = text.split(/[\n;]+/), out = [], missed = [];
+  var raws = text.split(/[\n;]+/), lines = [], out = [], missed = [];
+
+  /* "31 N 12 + BH 4" is two entries on the 31st, so split on + and give
+     each following piece the same date as the first */
+  for(var L=0;L<raws.length;L++){
+    if(!/\s\+\s/.test(raws[L])){ lines.push(raws[L]); continue; }
+    var segs = raws[L].split(/\s\+\s/), head = segs[0];
+    var dm0 = head.match(/^\s*(?:[A-Za-z]{3,9}\s+)?(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/.]\d{1,2}(?:[\/.]\d{2,4})?|\d{1,2})\b/);
+    lines.push(head);
+    for(var q=1;q<segs.length;q++) lines.push((dm0 ? dm0[1] + " " : "") + segs[q]);
+  }
 
   for(var i=0;i<lines.length;i++){
     var raw = lines[i].trim();
@@ -1184,11 +1323,18 @@ $("parseBtn").addEventListener("click", function(){
 
 function applyPending(){
   if(!pending) return;
+  var byDay = {};
   for(var i=0;i<pending.length;i++){
-    DB.shifts[pending[i].key] = {t:pending[i].typeId, h:pending[i].hours};
+    var k = pending[i].key;
+    if(!byDay[k]) byDay[k] = [];
+    byDay[k].push({t:pending[i].typeId, h:pending[i].hours});
   }
+  for(var day in byDay){ if(byDay.hasOwnProperty(day)) setEntries(day, byDay[day]); }
   save(); render();
-  toast("Added " + pending.length + " day" + (pending.length===1?"":"s"));
+  var dayCount = 0;
+  for(var dk in byDay){ if(byDay.hasOwnProperty(dk)) dayCount++; }
+  toast("Added " + pending.length + " entr" + (pending.length===1?"y":"ies") +
+        " over " + dayCount + " day" + (dayCount===1?"":"s"));
   $("parseOut").innerHTML = ""; $("importText").value = ""; pending = null;
   $("importAcc").open = false;
   window.scrollTo({top:0, behavior:"smooth"});
@@ -1229,14 +1375,15 @@ function buildICS(keys){
              "CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:Shifts"];
   var stamp = icsStamp(new Date()), n = 0;
   for(var i=0;i<keys.length;i++){
-    var key = keys[i], rec = DB.shifts[key];
-    if(!rec) continue;
-    var t = typeById(rec.t);
-    if(!t || t.mode === "unpaid") continue;
-    var h = (rec.h === null || rec.h === undefined) ? +t.hours : +rec.h;
+    var key = keys[i], ents = entriesOf(key);
+    for(var ei=0; ei<ents.length; ei++){
+    var t = typeById(ents[ei].t);
+    /* top-ups sit inside a shift that already has its own event */
+    if(!t || t.mode === "unpaid" || t.mode === "topup") continue;
+    var h = entryHours(ents[ei], t);
     if(!(h > 0)) continue;
     var pp = key.split("-"), y = +pp[0], mo = +pp[1]-1, dd = +pp[2];
-    out.push("BEGIN:VEVENT", "UID:" + key + "@rota-payslip", "DTSTAMP:" + stamp);
+    out.push("BEGIN:VEVENT", "UID:" + key + "-" + ei + "@rota-payslip", "DTSTAMP:" + stamp);
     if(t.start){
       var hm = String(t.start).split(":");
       var st = new Date(y, mo, dd, parseInt(hm[0],10) || 0, parseInt(hm[1],10) || 0);
@@ -1248,6 +1395,7 @@ function buildICS(keys){
     out.push("SUMMARY:" + icsEsc(t.name), "DESCRIPTION:" + icsEsc(hrs(h) + " hours"),
              "TRANSP:OPAQUE", "END:VEVENT");
     n++;
+    }
   }
   out.push("END:VCALENDAR");
   return {text: out.map(icsFold).join("\r\n") + "\r\n", count:n};
@@ -1339,7 +1487,9 @@ function renderTypes(){
   var html = "";
   for(var i=0;i<DB.types.length;i++){
     var t = DB.types[i];
-    var amtLabel = t.mode === "rate" ? "Rate " + GBP + "/hr" : t.mode === "base" ? "Uplift " + GBP + "/hr" : "&mdash;";
+    var amtLabel = t.mode === "rate" ? "Rate " + GBP + "/hr"
+                 : t.mode === "topup" ? "Top-up " + GBP + "/hr"
+                 : t.mode === "base" ? "Uplift " + GBP + "/hr" : "&mdash;";
     var amtVal = t.mode === "rate" ? t.rate : t.extra;
     html += '<div class="trow" style="--h:' + t.h + '" data-i="' + i + '">' +
       '<div class="trow-hd">' +
@@ -1356,6 +1506,7 @@ function renderTypes(){
         '<div><label>Paid as</label><select data-f="mode">' +
           '<option value="base"' + (t.mode==="base"?" selected":"") + '>Basic + uplift</option>' +
           '<option value="rate"' + (t.mode==="rate"?" selected":"") + '>Own rate</option>' +
+          '<option value="topup"' + (t.mode==="topup"?" selected":"") + '>Top-up only</option>' +
           '<option value="unpaid"' + (t.mode==="unpaid"?" selected":"") + '>Unpaid</option>' +
         '</select></div>' +
         (t.mode === "unpaid" ? "" :
@@ -1386,9 +1537,16 @@ $("typeList").addEventListener("click", function(e){
   } else if(act === "del"){
     if(DB.types.length <= 1){ toast("Keep at least one shift type"); return; }
     var id = DB.types[i].id, used = 0;
-    for(var k in DB.shifts){ if(DB.shifts[k].t === id) used++; }
+    for(var k in DB.shifts){
+      var es = entriesOf(k);
+      for(var u=0;u<es.length;u++) if(es[u].t === id) used++;
+    }
     if(used && !confirm("Delete " + DB.types[i].name + "? It's used on " + used + " day" + (used===1?"":"s") + ", which will be cleared.")) return;
-    for(var k2 in DB.shifts){ if(DB.shifts[k2].t === id) delete DB.shifts[k2]; }
+    for(var k2 in DB.shifts){
+      var kept = [], es2 = entriesOf(k2);
+      for(var v=0;v<es2.length;v++) if(es2[v].t !== id) kept.push(es2[v]);
+      setEntries(k2, kept);
+    }
     DB.types.splice(i,1);
     save(); renderTypes(); render();
   }
@@ -1480,7 +1638,8 @@ function encode(){ return btoa(unescape(encodeURIComponent(JSON.stringify(DB))))
 
 function applyRestore(d){
   if(!d || !d.settings || !d.types || !d.shifts) throw new Error("shape");
-  DB = {settings:Object.assign(defaults().settings, d.settings), types:d.types, shifts:d.shifts};
+  DB = {settings:Object.assign(defaults().settings, d.settings), types:d.types,
+        shifts:normaliseShifts(d.shifts)};
   S = DB.settings;
   save(); renderSetup(); render();
 }

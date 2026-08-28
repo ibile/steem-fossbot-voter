@@ -55,12 +55,46 @@ Mon 4 D 07:00-19:00      hours taken from the time range
 2026-09-06 AL            ISO date
 8 N 11.5                 part shift
 Thu 10 LD 7.30-19.30     rota codes: LD, ND, E, L, RD, X, OFF...
+30 N 12 + BHT 4          two entries on one day, split on " + "
 ```
 
 A bare day number is matched against the period on screen; where a five-week
 period holds that day number twice, the one nearest today wins. Anything the
 parser can't read is listed rather than silently dropped, and nothing is applied
 until you confirm the preview.
+
+## Several entries in one day
+
+A day holds a list of entries, not a single shift. That covers a double shift,
+a shift split across two rates, and — the case this was built for — hours inside
+a shift that earn an enhancement.
+
+Shift types have four pay modes:
+
+| Mode | What the hours do |
+| --- | --- |
+| Basic + uplift | Paid at basic, plus any uplift, on their own hours |
+| Own rate | Paid at the type's own rate instead of basic |
+| **Top-up only** | Earn *only* the extra per hour — no basic, no hours added |
+| Unpaid | Marks the day, pays nothing |
+
+**Top-up only** is the one that makes bank holidays work. If a bank holiday
+falls inside a night shift, the shift is already paying basic for those hours;
+the enhancement is a separate line on the payslip covering a subset of the same
+hours. Entering it as an ordinary shift would count those hours twice. So a
+night shift with four qualifying bank-holiday hours is two entries:
+
+```
+N    Night shift          12 h     basic on all twelve
+BHT  Bank holiday hours    4 h     the enhancement on four of them
+```
+
+Twelve basic hours, four hours of enhancement, nothing double counted. The same
+pattern handles overtime hours paid as an uplift within a normal shift, which is
+how the payslip this was built from is laid out.
+
+Top-up entries do not count towards the shift or hours totals, and they produce
+no calendar event, because the shift they sit inside already has one.
 
 ## Calendar
 
