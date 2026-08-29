@@ -98,6 +98,7 @@
         done = true; clearTimeout(timer);
         resolve({
           ok: true,
+          lat: pos.coords.latitude, lon: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
           hasSpeed: pos.coords.speed !== null && pos.coords.speed !== undefined,
           hasHeading: pos.coords.heading !== null && pos.coords.heading !== undefined

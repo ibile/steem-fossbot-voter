@@ -13,7 +13,7 @@ const path = require('path');
 const ROOT = __dirname;
 const ORDER = [
   'util', 'kinematics', 'events', 'scoring', 'trip',
-  'storage', 'alerts', 'sensors', 'simulate', 'exporters', 'charts', 'app'
+  'storage', 'alerts', 'sensors', 'speedlimits', 'simulate', 'exporters', 'charts', 'app'
 ];
 
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

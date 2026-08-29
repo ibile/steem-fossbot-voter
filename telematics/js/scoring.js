@@ -112,12 +112,14 @@
       available: acc.movingMs > 30000
     });
 
-    // Focus: screen taps while the vehicle is moving.
+    // Focus: taps on this app while the vehicle is moving. A weak proxy for
+    // phone handling — it cannot see the rest of your phone — so it is
+    // softened and floored at 45 rather than allowed to sink a whole trip.
     var perHour = movingH > 0.02 ? (acc.interactions || 0) / movingH : 0;
     comps.push({
       key: 'focus', label: LABELS.focus, weight: WEIGHTS.focus,
-      score: decayScore(perHour, 0.0372),
-      rate: perHour, count: acc.interactions || 0, unit: 'screen taps per hour',
+      score: U.clamp(decayScore(perHour, 0.0271), 45, 100),
+      rate: perHour, count: acc.interactions || 0, unit: 'taps in this app per hour',
       available: acc.movingMs > 60000
     });
 

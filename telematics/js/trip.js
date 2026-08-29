@@ -32,7 +32,7 @@
       distanceM: 0, movingMs: 0, idleMs: 0, totalMs: 0,
       maxSpeed: 0, limitKnownMs: 0,
       overMs: { mild: 0, harsh: 0, severe: 0 },
-      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0,
+      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0, limitAutoMs: 0,
       jerkSqSum: 0, jerkMs: 0, events: []
     };
     this.finished = false;
@@ -84,6 +84,7 @@
       if (hr >= 23 || hr < 5) a.nightMs += dt;
       if (this.limit) {
         a.limitKnownMs += dt;
+        if (this.limitSource === 'auto') a.limitAutoMs += dt;
         var trigger = this.limit * 1.05 + 0.45;
         if (s.speed > trigger) {
           var pct = (s.speed - this.limit) / this.limit * 100;
@@ -143,7 +144,7 @@
       distanceM: a.distanceM, movingMs: a.movingMs, idleMs: a.idleMs,
       totalMs: a.totalMs, maxSpeed: a.maxSpeed, limitKnownMs: a.limitKnownMs,
       overMs: { mild: a.overMs.mild, harsh: a.overMs.harsh, severe: a.overMs.severe },
-      maxOverPct: a.maxOverPct, excessPctMs: a.excessPctMs,
+      maxOverPct: a.maxOverPct, excessPctMs: a.excessPctMs, limitAutoMs: a.limitAutoMs,
       meanExcessPct: a.limitKnownMs > 0 ? a.excessPctMs / a.limitKnownMs : 0,
       nightMs: a.nightMs, interactions: a.interactions,
       jerkRms: a.jerkMs > 0 ? Math.sqrt(a.jerkSqSum / a.jerkMs) : 0,

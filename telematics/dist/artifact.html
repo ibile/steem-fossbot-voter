@@ -289,8 +289,45 @@ main { flex: 1; padding: 16px; padding-bottom: 92px; }
   font-variant-numeric: tabular-nums;
 }
 
+/* Limit strip: sits directly under the speed so it is reachable without
+   scrolling. Scrolling to reach a control used to register as distraction. */
+.limitbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 20px;
+}
+.limitbar-src {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(199,125,255,0.14);
+  color: var(--speed);
+  flex: 0 0 auto;
+}
+.limitbar-src.is-manual { background: rgba(56,198,224,0.14); color: var(--accent); }
+.limitbar-src.is-off { background: rgba(132,148,165,0.14); color: var(--muted); }
+.limitbar-src.is-bad { background: rgba(233,161,59,0.14); color: var(--warn); }
+.limitbar-road {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.limit-sign { cursor: pointer; padding: 0; }
+.limit-sign:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
 /* limit picker */
-.limit-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.limit-picker { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.limit-picker.hidden { display: none; }
 .limit-btn {
   flex: 1 1 auto;
   min-width: 48px;
@@ -754,8 +791,14 @@ a { color: var(--accent); }
               <div class="speed-readout tnum" id="hudSpeed">0</div>
               <div class="speed-unit" id="hudSpeedUnit">MPH</div>
             </div>
-            <div class="limit-sign is-unset" id="hudLimit">SET</div>
+            <button class="limit-sign is-unset" id="hudLimit" type="button"
+                    aria-label="Speed limit — tap to set manually">SET</button>
           </div>
+          <div class="limitbar" id="limitBar">
+            <span class="limitbar-src" id="limitSrc">Automatic</span>
+            <span class="limitbar-road" id="limitRoad">Waiting for a fix…</span>
+          </div>
+          <div class="limit-picker hidden" id="limitPicker"></div>
         </div>
 
         <div class="hud-grid">
@@ -781,12 +824,6 @@ a { color: var(--accent); }
               <div class="tile is-speed"><div class="tile-label">Speeding</div><div class="tile-value" id="cntSpeed">0</div></div>
             </div>
           </div>
-        </div>
-
-        <div class="card" id="limitCard">
-          <div class="card-head"><span class="card-title">Speed limit here</span>
-            <span class="card-title" id="limitHint">tap as it changes</span></div>
-          <div class="limit-picker" id="limitPicker"></div>
         </div>
 
         <div class="card">
@@ -926,6 +963,25 @@ a { color: var(--accent); }
               <button data-v="lenient">Lenient</button><button data-v="standard">Standard</button><button data-v="strict">Strict</button>
             </div>
           </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Speed limits</span></div>
+          <div class="field">
+            <div class="field-label">Where limits come from
+              <small id="limitModeDesc">Looked up automatically from OpenStreetMap</small></div>
+            <div class="seg" id="segLimit">
+              <button data-v="auto">Auto</button><button data-v="manual">Manual</button><button data-v="off">Off</button>
+            </div>
+          </div>
+          <p class="fine" style="margin-top:10px">
+            Automatic lookup fetches the roads around you roughly once a
+            kilometre and reads their published limit — no tapping while you
+            drive. It needs a data connection, and only covers roads that
+            carry a limit in the map. Where none is published, that stretch is
+            left out of the speed score rather than guessed at. You can always
+            tap the roundel to override.
+          </p>
         </div>
 
         <div class="card">
@@ -1850,12 +1906,14 @@ a { color: var(--accent); }
       available: acc.movingMs > 30000
     });
 
-    // Focus: screen taps while the vehicle is moving.
+    // Focus: taps on this app while the vehicle is moving. A weak proxy for
+    // phone handling — it cannot see the rest of your phone — so it is
+    // softened and floored at 45 rather than allowed to sink a whole trip.
     var perHour = movingH > 0.02 ? (acc.interactions || 0) / movingH : 0;
     comps.push({
       key: 'focus', label: LABELS.focus, weight: WEIGHTS.focus,
-      score: decayScore(perHour, 0.0372),
-      rate: perHour, count: acc.interactions || 0, unit: 'screen taps per hour',
+      score: U.clamp(decayScore(perHour, 0.0271), 45, 100),
+      rate: perHour, count: acc.interactions || 0, unit: 'taps in this app per hour',
       available: acc.movingMs > 60000
     });
 
@@ -1992,7 +2050,7 @@ a { color: var(--accent); }
       distanceM: 0, movingMs: 0, idleMs: 0, totalMs: 0,
       maxSpeed: 0, limitKnownMs: 0,
       overMs: { mild: 0, harsh: 0, severe: 0 },
-      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0,
+      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0, limitAutoMs: 0,
       jerkSqSum: 0, jerkMs: 0, events: []
     };
     this.finished = false;
@@ -2044,6 +2102,7 @@ a { color: var(--accent); }
       if (hr >= 23 || hr < 5) a.nightMs += dt;
       if (this.limit) {
         a.limitKnownMs += dt;
+        if (this.limitSource === 'auto') a.limitAutoMs += dt;
         var trigger = this.limit * 1.05 + 0.45;
         if (s.speed > trigger) {
           var pct = (s.speed - this.limit) / this.limit * 100;
@@ -2103,7 +2162,7 @@ a { color: var(--accent); }
       distanceM: a.distanceM, movingMs: a.movingMs, idleMs: a.idleMs,
       totalMs: a.totalMs, maxSpeed: a.maxSpeed, limitKnownMs: a.limitKnownMs,
       overMs: { mild: a.overMs.mild, harsh: a.overMs.harsh, severe: a.overMs.severe },
-      maxOverPct: a.maxOverPct, excessPctMs: a.excessPctMs,
+      maxOverPct: a.maxOverPct, excessPctMs: a.excessPctMs, limitAutoMs: a.limitAutoMs,
       meanExcessPct: a.limitKnownMs > 0 ? a.excessPctMs / a.limitKnownMs : 0,
       nightMs: a.nightMs, interactions: a.interactions,
       jerkRms: a.jerkMs > 0 ? Math.sqrt(a.jerkSqSum / a.jerkMs) : 0,
@@ -2156,7 +2215,7 @@ a { color: var(--accent); }
     beeps: true,
     vibrate: true,
     keepAwake: true,
-    limitMode: 'manual',        // 'manual' | 'off'
+    limitMode: 'auto',          // 'auto' | 'manual' | 'off'
     defaultLimit: 30,           // in display units
     demoRate: 12,
     demoProfile: 'average'
@@ -2460,6 +2519,7 @@ a { color: var(--accent); }
         done = true; clearTimeout(timer);
         resolve({
           ok: true,
+          lat: pos.coords.latitude, lon: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
           hasSpeed: pos.coords.speed !== null && pos.coords.speed !== undefined,
           hasHeading: pos.coords.heading !== null && pos.coords.heading !== undefined
@@ -2570,6 +2630,323 @@ a { color: var(--accent); }
     keepAwake: keepAwake, reacquireWakeLock: reacquireWakeLock,
     inIframe: inIframe
   };
+})(window.TL = window.TL || {});
+
+/* ===== speedlimits.js ===== */
+/* Automatic speed limits by map-matching against OpenStreetMap.
+ *
+ * Asking the driver to tap the limit every time it changes is both distracting
+ * and unreliable — miss one change and the trip is scored against the wrong
+ * number. So the limit is looked up instead: fetch the roads around the car
+ * once every kilometre or so, match the current position and heading to a road,
+ * and read its maxspeed tag.
+ *
+ * Only ways that actually carry a limit tag are requested, which keeps the
+ * responses small and means "no data" is reported honestly rather than guessed.
+ */
+(function (TL) {
+  'use strict';
+  var U = TL.util;
+  var MPH = 0.44704, KMH = 1 / 3.6;
+
+  var ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.osm.jp/api/interpreter'
+  ];
+
+  var RADIUS_M = 1800;        // how much road to pull in one go
+  var REFETCH_M = 1000;       // travel from the fetch centre before refreshing
+  var LOOK_AHEAD_M = 500;     // bias the centre along the direction of travel
+  var MATCH_BASE_M = 26;      // how close a road must be to be a candidate
+  var MIN_GAP_MS = 15000;     // never hammer the endpoint
+  var TIMEOUT_MS = 14000;
+
+  /* --- tag parsing ------------------------------------------------------- */
+  /* Returns m/s, or null when the tag does not state a usable numeric limit. */
+  function parseMaxspeed(tags) {
+    var raw = tags.maxspeed;
+    if (raw != null) {
+      var s = String(raw).trim().toLowerCase();
+      // "none" (unlimited autobahn), "signals"/"variable" (gantry-controlled)
+      // and conditional lists are all real values we cannot score against.
+      if (s === 'none' || s === 'signals' || s === 'variable') return null;
+      if (s === 'walk' || s === 'foot') return 5 * KMH;
+      if (s.indexOf(';') >= 0 || s.indexOf('@') >= 0) return null;
+      var m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s*(mph|km\/h|kmh|kph)?$/);
+      if (m) {
+        var n = parseFloat(m[1]);
+        if (!isFinite(n) || n <= 0 || n > 90) return null;   // 90 m/s sanity cap
+        return m[2] === 'mph' ? n * MPH : n * KMH;
+      }
+      // Some ways carry an implied-limit code directly in maxspeed.
+      var implied = parseImplied(s);
+      if (implied) return implied;
+    }
+    var t = tags['maxspeed:type'] || tags['source:maxspeed'] || tags['zone:maxspeed'];
+    return t ? parseImplied(String(t).trim().toLowerCase()) : null;
+  }
+
+  /* Implied national limits. Only codes whose meaning is unambiguous are
+     honoured — a wrong limit is worse than no limit. */
+  function parseImplied(t) {
+    if (t.indexOf('gb:motorway') >= 0) return 70 * MPH;
+    if (t.indexOf('gb:nsl_dual') >= 0) return 70 * MPH;
+    if (t.indexOf('gb:nsl_single') >= 0) return 60 * MPH;
+    var gbZone = t.match(/gb:zone[:_]?([0-9]{2})/);
+    if (gbZone) return parseFloat(gbZone[1]) * MPH;
+    // "<country>:zone30" style, metric.
+    var zone = t.match(/^[a-z]{2}:zone[:_]?([0-9]{2,3})$/);
+    if (zone) return parseFloat(zone[1]) * KMH;
+    return null;
+  }
+
+  function roadRank(highway) {
+    switch (highway) {
+      case 'motorway': case 'motorway_link': return 6;
+      case 'trunk': case 'trunk_link': return 5;
+      case 'primary': case 'primary_link': return 4;
+      case 'secondary': case 'secondary_link': return 3;
+      case 'tertiary': case 'tertiary_link': return 2;
+      default: return 1;
+    }
+  }
+
+  /* --- provider ---------------------------------------------------------- */
+  function SpeedLimits() {
+    this.reset();
+  }
+
+  SpeedLimits.prototype.reset = function () {
+    this.ways = [];
+    this.origin = null;
+    this.center = null;
+    this.status = 'idle';       // idle | fetching | ok | error | offline
+    this.error = null;
+    this.lastFetchT = 0;
+    this.backoffMs = 0;
+    this.failures = 0;
+    this.current = null;        // {limit, name, highway, dist}
+    this.lastWayKey = null;
+    this.fetchCount = 0;
+    this.abort = null;
+  };
+
+  SpeedLimits.prototype.stop = function () {
+    if (this.abort) { try { this.abort.abort(); } catch (e) {} this.abort = null; }
+  };
+
+  /* Equirectangular projection is exact enough over a couple of kilometres
+     and keeps matching to cheap plane geometry. */
+  SpeedLimits.prototype._local = function (lat, lon) {
+    var o = this.origin;
+    var kx = 111320 * Math.cos(U.toRad(o.lat));
+    return [(lon - o.lon) * kx, (lat - o.lat) * 110540];
+  };
+
+  /* Feed every position fix. Returns the current match (or null). */
+  SpeedLimits.prototype.update = function (fix) {
+    var need = false;
+    if (!this.center) {
+      need = true;
+    } else {
+      var d = U.haversine(fix.lat, fix.lon, this.center.lat, this.center.lon);
+      if (d > REFETCH_M) need = true;
+    }
+    if (need) this._maybeFetch(fix);
+    return this.match(fix);
+  };
+
+  SpeedLimits.prototype._maybeFetch = function (fix) {
+    var now = Date.now();
+    if (this.status === 'fetching') return;
+    if (now - this.lastFetchT < Math.max(MIN_GAP_MS, this.backoffMs)) return;
+    if (typeof fetch !== 'function') {
+      this.status = 'offline';
+      this.error = 'This browser cannot make the network request.';
+      return;
+    }
+    this.lastFetchT = now;
+    this._fetch(fix);
+  };
+
+  SpeedLimits.prototype._fetch = function (fix) {
+    var self = this;
+    // Look ahead: by the time the data lands the car has moved on.
+    var c = { lat: fix.lat, lon: fix.lon };
+    if (fix.heading != null && fix.speed > 8) {
+      var p = U.offsetLatLon(fix.lat, fix.lon,
+        LOOK_AHEAD_M * Math.sin(U.toRad(fix.heading)),
+        LOOK_AHEAD_M * Math.cos(U.toRad(fix.heading)));
+      c = { lat: p.lat, lon: p.lon };
+    }
+
+    var q = '[out:json][timeout:25];(' +
+      'way(around:' + RADIUS_M + ',' + c.lat.toFixed(5) + ',' + c.lon.toFixed(5) + ')["highway"]["maxspeed"];' +
+      'way(around:' + RADIUS_M + ',' + c.lat.toFixed(5) + ',' + c.lon.toFixed(5) + ')["highway"]["maxspeed:type"];' +
+      ');out tags geom;';
+
+    var endpoint = ENDPOINTS[this.failures % ENDPOINTS.length];
+    this.status = 'fetching';
+    this.error = null;
+
+    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+    this.abort = ctrl;
+    var timer = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) {} }, TIMEOUT_MS);
+
+    return fetch(endpoint, {
+      method: 'POST',
+      body: 'data=' + encodeURIComponent(q),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (json) {
+      clearTimeout(timer);
+      self.abort = null;
+      self._ingest(json, c);
+    }).catch(function (err) {
+      clearTimeout(timer);
+      self.abort = null;
+      self.failures++;
+      self.backoffMs = Math.min(120000, 20000 * self.failures);
+      self.status = 'error';
+      self.error = describeFetchError(err);
+    });
+  };
+
+  /* One-off lookup at a fixed point, for the diagnostics screen. Always
+     resolves — the result says whether it worked. */
+  SpeedLimits.prototype.testLookup = function (lat, lon) {
+    var self = this;
+    this.lastFetchT = Date.now();
+    return this._fetch({ lat: lat, lon: lon, heading: null, speed: 0 }).then(function () {
+      var m = self.match({ lat: lat, lon: lon, heading: null, speed: 0, accuracy: 12 });
+      return {
+        ok: self.status === 'ok' && self.ways.length > 0,
+        status: self.status, ways: self.ways.length,
+        match: m, error: self.error
+      };
+    });
+  };
+
+  function describeFetchError(err) {
+    var msg = String((err && err.message) || err || '');
+    if (/abort/i.test(msg)) return 'The lookup timed out.';
+    if (/HTTP 429/.test(msg)) return 'The map service is rate limiting; it will retry shortly.';
+    if (/HTTP 50/.test(msg)) return 'The map service is temporarily unavailable.';
+    if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+      return 'Could not reach the map service — no connection, or this page is not allowed to make the request.';
+    }
+    return msg || 'Lookup failed.';
+  }
+
+  SpeedLimits.prototype._ingest = function (json, center) {
+    var els = (json && json.elements) || [];
+    if (!Array.isArray(els)) { this.status = 'error'; this.error = 'Unexpected response.'; return; }
+
+    this.origin = { lat: center.lat, lon: center.lon };
+    var ways = [];
+    for (var i = 0; i < els.length; i++) {
+      var e = els[i];
+      if (!e || e.type !== 'way' || !e.tags || !Array.isArray(e.geometry)) continue;
+      var limit = parseMaxspeed(e.tags);
+      if (!(limit > 0)) continue;
+      var g = e.geometry, xs = [], ys = [];
+      for (var j = 0; j < g.length; j++) {
+        var pt = g[j];
+        if (!pt || typeof pt.lat !== 'number' || typeof pt.lon !== 'number') continue;
+        var l = this._local(pt.lat, pt.lon);
+        xs.push(l[0]); ys.push(l[1]);
+      }
+      if (xs.length < 2) continue;
+      ways.push({
+        key: 'w' + e.id,
+        limit: limit,
+        name: e.tags.name || e.tags.ref || null,
+        highway: e.tags.highway || '',
+        rank: roadRank(e.tags.highway),
+        xs: xs, ys: ys
+      });
+    }
+    this.ways = ways;
+    this.center = { lat: center.lat, lon: center.lon };
+    this.fetchCount++;
+    this.failures = 0;
+    this.backoffMs = 0;
+    this.status = 'ok';
+    this.error = ways.length ? null : 'No roads with a published limit near here.';
+  };
+
+  /* Squared distance from a point to a segment, plus the segment's bearing. */
+  function segDist2(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay;
+    var len2 = dx * dx + dy * dy;
+    var t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    var cx = ax + t * dx, cy = ay + t * dy;
+    return { d2: (px - cx) * (px - cx) + (py - cy) * (py - cy), dx: dx, dy: dy };
+  }
+
+  SpeedLimits.prototype.match = function (fix) {
+    if (!this.origin || !this.ways.length) { this.current = null; return null; }
+    var p = this._local(fix.lat, fix.lon);
+    var px = p[0], py = p[1];
+    var tol = Math.max(MATCH_BASE_M, Math.min(60, (fix.accuracy || 12) * 1.6));
+    var best = null, prev = null;
+
+    for (var i = 0; i < this.ways.length; i++) {
+      var w = this.ways[i];
+      var bd2 = Infinity, bdx = 0, bdy = 0;
+      for (var j = 1; j < w.xs.length; j++) {
+        var r = segDist2(px, py, w.xs[j - 1], w.ys[j - 1], w.xs[j], w.ys[j]);
+        if (r.d2 < bd2) { bd2 = r.d2; bdx = r.dx; bdy = r.dy; }
+      }
+      var dist = Math.sqrt(bd2);
+      if (dist > tol) continue;
+
+      // Prefer a road running the way we are actually travelling: it separates
+      // a dual carriageway from the side road beside it.
+      var align = 1;
+      if (fix.heading != null && fix.speed > 4) {
+        var segBearing = U.toDeg(Math.atan2(bdx, bdy));
+        var diff = Math.abs(U.angleDiff(segBearing, fix.heading));
+        if (diff > 90) diff = 180 - diff;              // roads are bidirectional
+        align = Math.cos(U.toRad(diff));
+      }
+      var cost = dist + 45 * (1 - align) - w.rank * 1.5;
+      var cand = { way: w, dist: dist, cost: cost };
+      if (!best || cost < best.cost) best = cand;
+      if (w.key === this.lastWayKey) prev = cand;
+    }
+
+    // Stickiness: only leave the road we were on when something is clearly
+    // better, or the score flickers between parallel roads at every fix.
+    var chosen = best;
+    if (prev && best && prev !== best && prev.cost < best.cost + 12) chosen = prev;
+    if (!chosen) { this.current = null; this.lastWayKey = null; return null; }
+
+    this.lastWayKey = chosen.way.key;
+    this.current = {
+      limit: chosen.way.limit,
+      name: chosen.way.name,
+      highway: chosen.way.highway,
+      dist: chosen.dist
+    };
+    return this.current;
+  };
+
+  SpeedLimits.prototype.describe = function () {
+    if (this.status === 'fetching' && !this.ways.length) return 'Looking up roads nearby…';
+    if (this.status === 'error' || this.status === 'offline') return this.error || 'Lookup unavailable.';
+    if (!this.ways.length) return this.error || 'No limit data loaded yet.';
+    if (!this.current) return 'No mapped limit for this road.';
+    return this.current.name || (this.current.highway || 'road').replace(/_/g, ' ');
+  };
+
+  TL.SpeedLimits = SpeedLimits;
+  TL.parseMaxspeed = parseMaxspeed;
 })(window.TL = window.TL || {});
 
 /* ===== simulate.js ===== */
@@ -3413,7 +3790,8 @@ a { color: var(--accent); }
     raf: null, trail: [], current: null, viewRecord: null, fromScreen: 'home',
     lastScoreT: 0, liveScore: null, ticker: [], profileGeom: null,
     hoverIdx: null, geoError: null, started: 0,
-    firstFixT: 0, lastFixT: 0, alertState: null, alertSpokenFor: null
+    firstFixT: 0, lastFixT: 0, alertState: null, alertSpokenFor: null,
+    limits: null, manualLimit: undefined, lastRoadKey: null
   };
 
   var TYPE_NAME = { brake: 'Harsh braking', accel: 'Harsh acceleration', corner: 'Sharp cornering', speeding: 'Over the limit' };
@@ -3458,6 +3836,7 @@ a { color: var(--accent); }
         S.geoError = null;
         S.lastFixT = Date.now();
         if (!S.firstFixT) S.firstFixT = S.lastFixT;
+        applyLimits(p);
       }, function (err) {
         S.geoError = err;
         setStatus(err.code === 1 ? 'No location' : 'Weak signal', err.code === 1 ? 'is-off' : 'is-warn');
@@ -3544,6 +3923,56 @@ a { color: var(--accent); }
     }
   }
 
+  /* Decide the limit for this moment: an explicit override wins, otherwise
+     the automatic lookup, otherwise nothing — and "nothing" is left unscored
+     rather than guessed. */
+  function applyLimits(fix) {
+    if (!S.trip) return;
+    var mode = S.settings.limitMode;
+    if (mode === 'off') { S.trip.setLimit(null, 'none'); renderLimitBar(); return; }
+    if (S.manualLimit !== undefined) {
+      S.trip.setLimit(S.manualLimit, S.manualLimit == null ? 'none' : 'manual');
+      renderLimitBar();
+      return;
+    }
+    if (mode !== 'auto') { renderLimitBar(); return; }
+    if (!S.limits) S.limits = new TL.SpeedLimits();
+    var m = S.limits.update(fix);
+    S.trip.setLimit(m ? m.limit : null, m ? 'auto' : 'none');
+    renderLimitBar();
+  }
+
+  function renderLimitBar() {
+    var src = $('limitSrc'), road = $('limitRoad');
+    if (!src) return;
+    var mode = S.settings.limitMode;
+    if (S.mode === 'demo') {
+      src.className = 'limitbar-src'; src.textContent = 'Demo';
+      road.textContent = 'Limits come from the simulated route';
+      return;
+    }
+    if (mode === 'off') {
+      src.className = 'limitbar-src is-off'; src.textContent = 'Off';
+      road.textContent = 'Speed is not being scored';
+      return;
+    }
+    if (S.manualLimit !== undefined) {
+      src.className = 'limitbar-src is-manual'; src.textContent = 'Manual';
+      road.textContent = S.manualLimit == null ? 'No limit set' : 'Tap the roundel to return to automatic';
+      return;
+    }
+    if (mode === 'manual') {
+      src.className = 'limitbar-src is-manual'; src.textContent = 'Manual';
+      road.textContent = 'Tap the roundel to set the limit';
+      return;
+    }
+    var L = S.limits;
+    var bad = L && (L.status === 'error' || L.status === 'offline');
+    src.className = 'limitbar-src' + (bad ? ' is-bad' : '');
+    src.textContent = bad ? 'Lookup failed' : 'Automatic';
+    road.textContent = L ? L.describe() : 'Waiting for a fix…';
+  }
+
   function beginTrip(mode) {
     S.mode = mode;
     S.trip = new TL.Trip({ sensitivity: S.settings.sensitivity });
@@ -3556,13 +3985,17 @@ a { color: var(--accent); }
       S.trip.setLimit(lim, lim ? 'manual' : 'none');
     }
     setDriveAlert(null);
+    S.manualLimit = undefined;
+    S.limits = new TL.SpeedLimits();
+    $('limitPicker').classList.add('hidden');
+    renderLimitBar();
     renderLimitPicker();
     renderTicker();
     updateCounts();
     setStatus(mode === 'demo' ? 'Demo' : 'Tracking', mode === 'demo' ? 'is-demo' : 'is-live');
     showScreen('drive');
     $('btnStop').textContent = mode === 'demo' ? 'Stop demo & score it' : 'End trip & score it';
-    $('limitCard').classList.toggle('hidden', mode === 'demo');
+    $('limitBar').classList.toggle('hidden', mode === 'demo' ? false : false);
   }
 
   function liveTick() {
@@ -3577,6 +4010,7 @@ a { color: var(--accent); }
     if (S.player) { S.player.stop(); S.player = null; }
     if (S.mode === 'live') {
       TL.sensors.stopGeo(); TL.sensors.stopMotion(); TL.sensors.keepAwake(false);
+      if (S.limits) S.limits.stop();
       S.trip.stop(Date.now());
     } else {
       S.trip.stop();
@@ -3667,6 +4101,7 @@ a { color: var(--accent); }
       $('liveScore').style.color = enough ? toneColor(S.liveScore.band.tone) : 'var(--dim)';
       $('liveBand').textContent = enough ? S.liveScore.band.label : 'Gathering data';
       CH.scoreRing($('liveRing'), enough ? S.liveScore.overall : 0, enough ? S.liveScore.band.tone : 'good');
+      if (S.mode === 'live') renderLimitBar();
     }
   }
 
@@ -3691,10 +4126,16 @@ a { color: var(--accent); }
     if (lim) {
       sign.classList.remove('is-unset');
       sign.textContent = Math.round(U.speedIn(lim, S.settings.units));
-    } else {
-      sign.classList.add('is-unset');
-      sign.textContent = S.mode === 'demo' ? 'AUTO' : 'SET';
+      return;
     }
+    sign.classList.add('is-unset');
+    if (S.mode === 'demo') { sign.textContent = 'AUTO'; return; }
+    if (S.settings.limitMode === 'off') { sign.textContent = 'OFF'; return; }
+    if (S.settings.limitMode === 'auto' && S.manualLimit === undefined) {
+      sign.textContent = S.limits && S.limits.ways.length ? 'NONE' : 'AUTO';
+      return;
+    }
+    sign.textContent = 'SET';
   }
 
   function renderLimitPicker() {
@@ -3702,24 +4143,36 @@ a { color: var(--accent); }
     box.innerHTML = '';
     var units = S.settings.units;
     var vals = LIMITS[units] || LIMITS.mph;
-    var cur = S.trip && S.trip.limit ? Math.round(U.speedIn(S.trip.limit, units)) : null;
+    var override = S.manualLimit;
+    var cur = override === undefined ? null
+      : (override == null ? 'off' : Math.round(U.speedIn(override, units)));
+
+    function choose(val) {
+      // undefined = hand control back to the automatic lookup
+      S.manualLimit = val;
+      if (typeof val === 'number') {
+        S.settings.defaultLimit = Math.round(U.speedIn(val, units));
+        TL.storage.saveSettings(S.settings);
+      }
+      if (S.trip && val !== undefined) S.trip.setLimit(val, val == null ? 'none' : 'manual');
+      renderLimitPicker(); updateLimitSign(); renderLimitBar();
+    }
+
+    if (S.settings.limitMode === 'auto') {
+      var auto = el('button', 'limit-btn' + (override === undefined ? ' is-on' : ''), 'auto');
+      auto.type = 'button';
+      auto.addEventListener('click', function () { choose(undefined); });
+      box.appendChild(auto);
+    }
     vals.forEach(function (v) {
       var b = el('button', 'limit-btn' + (cur === v ? ' is-on' : ''), String(v));
       b.type = 'button';
-      b.addEventListener('click', function () {
-        if (S.trip) S.trip.setLimit(U.speedFrom(v, units), 'manual');
-        S.settings.defaultLimit = v;
-        TL.storage.saveSettings(S.settings);
-        renderLimitPicker(); updateLimitSign();
-      });
+      b.addEventListener('click', function () { choose(U.speedFrom(v, units)); });
       box.appendChild(b);
     });
-    var off = el('button', 'limit-btn' + (cur == null ? ' is-on' : ''), 'off');
+    var off = el('button', 'limit-btn' + (cur === 'off' ? ' is-on' : ''), 'none');
     off.type = 'button';
-    off.addEventListener('click', function () {
-      if (S.trip) S.trip.setLimit(null, 'none');
-      renderLimitPicker(); updateLimitSign();
-    });
+    off.addEventListener('click', function () { choose(null); });
     box.appendChild(off);
   }
 
@@ -3840,7 +4293,16 @@ a { color: var(--accent); }
     var qbits = [];
     qbits.push(q.hasMotion ? (q.hasGyro ? 'GPS + accelerometer + gyro' : 'GPS + accelerometer') : 'GPS only');
     if (q.calConf != null && q.hasMotion) qbits.push('axis calibration ' + Math.round(q.calConf * 100) + '%');
-    if (!sc.speedMeasured) qbits.push('no speed limit set');
+    if (sc.speedMeasured) {
+      var speedComp = null;
+      sc.components.forEach(function (c) { if (c.key === 'speeding') speedComp = c; });
+      var autoPct = acc.limitKnownMs > 0 ? (acc.limitAutoMs || 0) / acc.limitKnownMs * 100 : 0;
+      var how = autoPct > 80 ? 'automatic' : (autoPct < 20 ? 'manual' : 'mixed');
+      qbits.push('limits ' + how + ', known for ' +
+        Math.round((speedComp ? speedComp.coverage : 0) * 100) + '% of the drive');
+    } else {
+      qbits.push('speed not scored — no limit was known');
+    }
     $('sumSub').textContent = qbits.join(' · ');
 
     var prov = $('sumProvisional');
@@ -4015,6 +4477,11 @@ a { color: var(--accent); }
   }
 
   /* ---------------- settings ---------------- */
+  var LIMIT_MODE_TEXT = {
+    auto: 'Looked up automatically from OpenStreetMap',
+    manual: 'You set the limit yourself as it changes',
+    off: 'Speed is not scored at all'
+  };
   var SENS_TEXT = {
     lenient: 'Lenient — harsh braking flags around 0.47 g',
     standard: 'Standard — harsh braking flags around 0.40 g',
@@ -4025,6 +4492,8 @@ a { color: var(--accent); }
     var s = S.settings;
     segSet('segUnits', s.units);
     segSet('segSens', s.sensitivity);
+    segSet('segLimit', s.limitMode);
+    $('limitModeDesc').textContent = LIMIT_MODE_TEXT[s.limitMode] || '';
     segSet('segRate', String(s.demoRate));
     $('sensDesc').textContent = SENS_TEXT[s.sensitivity];
     $('swVoice').checked = !!s.voice;
@@ -4106,6 +4575,25 @@ a { color: var(--accent); }
         r.motion.ok ? 'Working' : 'Blocked', r.motion.ok ? 'v-ok' : 'v-no'));
       host.appendChild(diagRow('Gyroscope', r.motion.gyro ? 'used for lateral g' : 'falls back to GPS heading',
         r.motion.gyro ? 'Working' : 'Absent', r.motion.gyro ? 'v-ok' : 'v-warn'));
+      if (r.geo.ok && S.settings.limitMode === 'auto') {
+        var pending = diagRow('Speed limit lookup', 'asking the map service…', 'Checking', 'v-idle');
+        host.appendChild(pending);
+        new TL.SpeedLimits().testLookup(r.geo.lat, r.geo.lon).then(function (t) {
+          var sub, val, cls;
+          if (t.ok) {
+            sub = t.match
+              ? 'matched ' + (t.match.name || 'this road') + ' at ' +
+                Math.round(U.speedIn(t.match.limit, S.settings.units)) + ' ' + U.speedUnit(S.settings.units) +
+                ' (' + t.ways + ' roads loaded)'
+              : t.ways + ' roads loaded nearby, but none matched this exact spot';
+            val = t.match ? 'Working' : 'No match'; cls = t.match ? 'v-ok' : 'v-warn';
+          } else {
+            sub = t.error || 'The lookup did not return usable data.';
+            val = 'Failed'; cls = 'v-no';
+          }
+          pending.replaceWith(diagRow('Speed limit lookup', sub, val, cls));
+        });
+      }
       host.appendChild(diagRow('Keep screen awake', st.wakeLockApi ? 'supported' : 'not supported — set your screen timeout longer',
         st.wakeLockApi ? 'Yes' : 'No', st.wakeLockApi ? 'v-ok' : 'v-warn'));
       host.appendChild(diagRow('Saving trips', st.storage ? 'local storage available' : 'local storage blocked — trips will not persist',
@@ -4272,6 +4760,12 @@ a { color: var(--accent); }
       renderSettings(); renderHome(); renderLimitPicker();
       if (S.viewRecord) renderSummary(S.viewRecord);
     });
+    segBind('segLimit', function (v) {
+      S.settings.limitMode = v;
+      TL.storage.saveSettings(S.settings);
+      S.manualLimit = undefined;
+      renderSettings(); renderLimitBar(); renderLimitPicker(); updateLimitSign();
+    });
     segBind('segSens', function (v) {
       S.settings.sensitivity = v; TL.storage.saveSettings(S.settings);
       if (S.trip) S.trip.setSensitivity(v);
@@ -4297,12 +4791,28 @@ a { color: var(--accent); }
       flash('harsh');
     });
 
-    // Count screen taps while moving, but not the limit picker: the app
-    // requires those, so charging the driver for them would be unfair.
+    // Count deliberate taps while moving — never a scroll, a long press, or
+    // any control the app itself requires. Counting scrolls was charging the
+    // driver for reaching a control the app made them use.
+    var tapStart = null;
     $('screen-drive').addEventListener('pointerdown', function (e) {
-      if (!S.trip || S.mode !== 'live') return;
-      if (e.target.closest('#limitCard') || e.target.closest('#btnStop')) return;
+      tapStart = { x: e.clientX, y: e.clientY, t: Date.now() };
+    });
+    $('screen-drive').addEventListener('pointercancel', function () { tapStart = null; });
+    $('screen-drive').addEventListener('pointerup', function (e) {
+      var st = tapStart; tapStart = null;
+      if (!st || !S.trip || S.mode !== 'live') return;
+      var dx = e.clientX - st.x, dy = e.clientY - st.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 14) return;      // a scroll, not a tap
+      if (Date.now() - st.t > 700) return;                // a long press
+      if (e.target.closest('#limitBar, #limitPicker, #hudLimit, #btnStop, #driveAlert')) return;
       S.trip.noteInteraction();
+    });
+
+    $('hudLimit').addEventListener('click', function () {
+      var pick = $('limitPicker');
+      pick.classList.toggle('hidden');
+      if (!pick.classList.contains('hidden')) renderLimitPicker();
     });
 
     // Speed profile hover

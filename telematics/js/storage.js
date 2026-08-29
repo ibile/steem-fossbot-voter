@@ -13,7 +13,7 @@
     beeps: true,
     vibrate: true,
     keepAwake: true,
-    limitMode: 'manual',        // 'manual' | 'off'
+    limitMode: 'auto',          // 'auto' | 'manual' | 'off'
     defaultLimit: 30,           // in display units
     demoRate: 12,
     demoProfile: 'average'

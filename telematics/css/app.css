@@ -286,8 +286,45 @@ main { flex: 1; padding: 16px; padding-bottom: 92px; }
   font-variant-numeric: tabular-nums;
 }
 
+/* Limit strip: sits directly under the speed so it is reachable without
+   scrolling. Scrolling to reach a control used to register as distraction. */
+.limitbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 20px;
+}
+.limitbar-src {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(199,125,255,0.14);
+  color: var(--speed);
+  flex: 0 0 auto;
+}
+.limitbar-src.is-manual { background: rgba(56,198,224,0.14); color: var(--accent); }
+.limitbar-src.is-off { background: rgba(132,148,165,0.14); color: var(--muted); }
+.limitbar-src.is-bad { background: rgba(233,161,59,0.14); color: var(--warn); }
+.limitbar-road {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.limit-sign { cursor: pointer; padding: 0; }
+.limit-sign:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
 /* limit picker */
-.limit-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.limit-picker { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.limit-picker.hidden { display: none; }
 .limit-btn {
   flex: 1 1 auto;
   min-width: 48px;

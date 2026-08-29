@@ -15,7 +15,7 @@ Sensors need a **secure origin**, so `file://` will not do for live tracking.
 
 | How | Command | Notes |
 |---|---|---|
-| Local server | `npx serve telematics` then open on your phone over the LAN | Needs HTTPS or `localhost` for sensors |
+| Local server | `npx serve telematics`, open on `localhost` | Plain `http://` to a LAN IP is **not** a secure context — sensors stay blocked |
 | GitHub Pages | enable Pages for the repo, open `/telematics/` | Easiest way to get it on a phone |
 | Single file | open `dist/traction-circle.html` | Demo mode works anywhere; live tracking still needs HTTPS |
 
@@ -32,6 +32,30 @@ location) with allow.
 **Demo mode needs no sensors at all.** Setup → Run the demo drive replays a
 simulated 17-minute journey through the real pipeline, so you can see the
 scoring behave before you drive anywhere.
+
+## Speed limits
+
+Limits are looked up automatically. Roughly once a kilometre the app fetches the
+roads around you from OpenStreetMap (via Overpass), map-matches your position
+and heading to one of them, and reads its published limit. Heading is part of
+the match, which is what separates a dual carriageway from the side road
+running beside it. Nothing to tap while driving.
+
+Only ways that actually carry a `maxspeed` or `maxspeed:type` tag are
+requested, which keeps responses small — one request covers a 1.8 km radius.
+Where a road publishes no limit, that stretch is **left out of the speed score**
+rather than guessed at, and the trip summary tells you what percentage of the
+drive had a known limit.
+
+Implied national limits are honoured where the code is unambiguous
+(`GB:nsl_single` → 60, `GB:nsl_dual` and `GB:motorway` → 70, `GB:zone20` → 20).
+Values that state no scoreable number — `none`, `signals`, `variable`,
+conditional lists — are treated as unknown rather than forced into a number.
+
+Tap the limit roundel at any time to override for the current road, or to
+switch back to automatic. Setup → Speed limits offers Auto / Manual / Off, and
+Setup → Run check performs a live lookup at your current position and reports
+exactly what came back.
 
 ## How the measurements are made
 
@@ -74,7 +98,7 @@ sensors at all still scores from GPS alone.
 | Cornering | 20% | severity-weighted events per 100 km |
 | Acceleration | 15% | severity-weighted events per 100 km |
 | Smoothness | 8% | RMS jerk (floored at 55 — a secondary signal) |
-| Focus | 6% | screen taps while moving |
+| Focus | 6% | deliberate taps on this app while moving (floored at 45) |
 | Context | 4% | night driving, hours without a break |
 
 - Events are **normalised per 100 km**, not counted raw. Two harsh brakes on a
@@ -103,9 +127,13 @@ noticeable, 0.40 g harsh, 0.52 g severe — adjustable in Setup.
 - **It cannot track in the background.** A browser tab is not a native app: the
   screen must stay on and the page must stay open. It will not silently log
   every journey.
-- **It has no map-matched speed limit data.** You set the limit as you drive.
-  Speed is only scored over the portion of the trip where a limit was known,
-  and the trip says so when it was not.
+- **Its speed limits are only as good as OpenStreetMap.** Coverage varies, and
+  a road with no published limit is not scored for speed at all. It has no
+  commercial limit database and does not know about temporary or variable
+  limits. Automatic lookup also needs a data connection.
+- **Focus is a weak measure.** It counts taps on *this app*, so it cannot see
+  the rest of your phone. It is deliberately floored so it nudges a score
+  rather than sinking one.
 - **It is not accepted by any insurer.** It is a mirror of your own driving,
   useful for seeing what these apps measure and how it feels to be scored —
   not a substitute for their telemetry.
@@ -125,6 +153,7 @@ telematics/
     storage.js         local persistence
     alerts.js          tones, speech, vibration
     sensors.js         hardware access and capability probing
+    speedlimits.js     OpenStreetMap lookup and map matching
     simulate.js        synthetic drive generator
     exporters.js       GPX / CSV / JSON
     charts.js          canvas instruments

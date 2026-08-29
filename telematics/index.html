@@ -113,8 +113,14 @@
               <div class="speed-readout tnum" id="hudSpeed">0</div>
               <div class="speed-unit" id="hudSpeedUnit">MPH</div>
             </div>
-            <div class="limit-sign is-unset" id="hudLimit">SET</div>
+            <button class="limit-sign is-unset" id="hudLimit" type="button"
+                    aria-label="Speed limit — tap to set manually">SET</button>
           </div>
+          <div class="limitbar" id="limitBar">
+            <span class="limitbar-src" id="limitSrc">Automatic</span>
+            <span class="limitbar-road" id="limitRoad">Waiting for a fix…</span>
+          </div>
+          <div class="limit-picker hidden" id="limitPicker"></div>
         </div>
 
         <div class="hud-grid">
@@ -140,12 +146,6 @@
               <div class="tile is-speed"><div class="tile-label">Speeding</div><div class="tile-value" id="cntSpeed">0</div></div>
             </div>
           </div>
-        </div>
-
-        <div class="card" id="limitCard">
-          <div class="card-head"><span class="card-title">Speed limit here</span>
-            <span class="card-title" id="limitHint">tap as it changes</span></div>
-          <div class="limit-picker" id="limitPicker"></div>
         </div>
 
         <div class="card">
@@ -288,6 +288,25 @@
         </div>
 
         <div class="card">
+          <div class="card-head"><span class="card-title">Speed limits</span></div>
+          <div class="field">
+            <div class="field-label">Where limits come from
+              <small id="limitModeDesc">Looked up automatically from OpenStreetMap</small></div>
+            <div class="seg" id="segLimit">
+              <button data-v="auto">Auto</button><button data-v="manual">Manual</button><button data-v="off">Off</button>
+            </div>
+          </div>
+          <p class="fine" style="margin-top:10px">
+            Automatic lookup fetches the roads around you roughly once a
+            kilometre and reads their published limit — no tapping while you
+            drive. It needs a data connection, and only covers roads that
+            carry a limit in the map. Where none is published, that stretch is
+            left out of the speed score rather than guessed at. You can always
+            tap the roundel to override.
+          </p>
+        </div>
+
+        <div class="card">
           <div class="card-head"><span class="card-title">Alerts while driving</span></div>
           <div class="field">
             <div class="field-label">Spoken alerts <small>Only for harsh and severe events</small></div>
@@ -387,6 +406,7 @@
 <script src="js/storage.js"></script>
 <script src="js/alerts.js"></script>
 <script src="js/sensors.js"></script>
+<script src="js/speedlimits.js"></script>
 <script src="js/simulate.js"></script>
 <script src="js/exporters.js"></script>
 <script src="js/charts.js"></script>
