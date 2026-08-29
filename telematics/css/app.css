@@ -344,6 +344,44 @@ main { flex: 1; padding: 16px; padding-bottom: 92px; }
 .sev-harsh { background: rgba(233,161,59,0.18); color: var(--warn); }
 .sev-severe { background: rgba(239,79,79,0.2); color: #FF8B8B; }
 
+/* Nothing-is-being-recorded banner. Loud on purpose: a small status pill is
+   not enough to notice from the driver's seat, and a silently dead trip
+   wastes the whole journey. */
+.alertbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 13px 15px;
+  border-radius: var(--r-md);
+  background: rgba(239, 79, 79, 0.12);
+  border: 1px solid rgba(239, 79, 79, 0.55);
+  animation: alertPulse 2.4s ease-in-out infinite;
+}
+.alertbar.is-soft {
+  background: rgba(233, 161, 59, 0.11);
+  border-color: rgba(233, 161, 59, 0.5);
+  animation: none;
+}
+@keyframes alertPulse {
+  0%, 100% { border-color: rgba(239, 79, 79, 0.55); }
+  50%      { border-color: rgba(239, 79, 79, 1); }
+}
+@media (prefers-reduced-motion: reduce) { .alertbar { animation: none; } }
+.alertbar-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #FF8B8B;
+}
+.alertbar.is-soft .alertbar-title { color: var(--warn); }
+.alertbar-body { font-size: 13px; color: var(--ink-2); margin-top: 2px; max-width: 46ch; }
+.alertbar-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+.alertbar-actions .btn { padding: 8px 14px; font-size: 13px; }
+
 /* flash overlay for real-time alerts */
 .flash {
   position: fixed; inset: 0;

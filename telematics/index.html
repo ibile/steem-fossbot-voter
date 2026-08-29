@@ -40,6 +40,12 @@
             <button class="btn" id="btnDemoHome">Try a demo drive instead</button>
             <button class="btn" id="btnCheck">Check my sensors</button>
           </div>
+          <div class="note warn hidden" id="homeBlocked" style="margin-top:14px">
+            <strong>Live tracking will not work in this view.</strong>
+            This page is embedded inside another app, which is not letting it read
+            your location, so a trip would record nothing at all. Open it from its
+            own web address to track a real drive. The demo works here either way.
+          </div>
         </div>
 
         <div class="card hidden" id="cardRolling">
@@ -81,6 +87,17 @@
     <!-- ================= DRIVE ================= -->
     <section class="screen" id="screen-drive">
       <div class="stack">
+        <div class="alertbar hidden" id="driveAlert">
+          <div>
+            <div class="alertbar-title" id="driveAlertTitle">No location</div>
+            <div class="alertbar-body" id="driveAlertBody"></div>
+          </div>
+          <div class="alertbar-actions">
+            <button class="btn" id="btnAlertWhy" type="button">Why?</button>
+            <button class="btn btn-danger" id="btnAlertStop" type="button">Stop</button>
+          </div>
+        </div>
+
         <div class="hud-top">
           <div class="hud-meta">
             <span>TIME <b id="hudTime">0:00</b></span>

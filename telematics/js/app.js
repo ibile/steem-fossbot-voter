@@ -14,7 +14,8 @@
     settings: null, trips: [], trip: null, mode: 'idle', player: null,
     raf: null, trail: [], current: null, viewRecord: null, fromScreen: 'home',
     lastScoreT: 0, liveScore: null, ticker: [], profileGeom: null,
-    hoverIdx: null, geoError: null, started: 0
+    hoverIdx: null, geoError: null, started: 0,
+    firstFixT: 0, lastFixT: 0, alertState: null, alertSpokenFor: null
   };
 
   var TYPE_NAME = { brake: 'Harsh braking', accel: 'Harsh acceleration', corner: 'Sharp cornering', speeding: 'Over the limit' };
@@ -53,9 +54,12 @@
         TL.sensors.startMotion(function (m) { if (S.trip) S.trip.feedMotion(m); });
       }
       beginTrip('live');
+      S.firstFixT = 0; S.lastFixT = 0; S.alertState = null; S.alertSpokenFor = null;
       var ok = TL.sensors.startGeo(function (p) {
         if (S.trip) S.trip.feedPosition(p);
         S.geoError = null;
+        S.lastFixT = Date.now();
+        if (!S.firstFixT) S.firstFixT = S.lastFixT;
       }, function (err) {
         S.geoError = err;
         setStatus(err.code === 1 ? 'No location' : 'Weak signal', err.code === 1 ? 'is-off' : 'is-warn');
@@ -63,6 +67,83 @@
       if (!ok) setStatus('No location', 'is-off');
       if (S.settings.keepAwake) TL.sensors.keepAwake(true);
     });
+  }
+
+  /* A trip that is recording nothing must say so loudly and early. Watching a
+     status pill go red is not enough from the driver's seat — the failure mode
+     this replaces was a 35-minute trip that captured no distance at all. */
+  var NO_FIX_MS = 15000;      // never got a fix
+  var STUCK_MS = 60000;       // still nothing, and no error to explain it
+  var LOST_FIX_MS = 45000;    // had one, then lost it
+
+  function checkFixHealth() {
+    if (S.mode !== 'live' || !S.trip) { setDriveAlert(null); return; }
+    var now = Date.now();
+    if (!S.firstFixT) {
+      var denied = S.geoError && S.geoError.code === 1;
+      var waited = now - S.started;
+      // Warn the instant a denial is known; otherwise give a fix a few
+      // seconds to arrive before crying wolf.
+      if (denied || waited > NO_FIX_MS) {
+        var embedded = TL.sensors.inIframe();
+        if (denied) {
+          setDriveAlert({
+            key: 'denied', hard: true, title: 'Location blocked',
+            body: embedded
+              ? 'Nothing is being recorded. This page is embedded inside another app, which is not letting it read your location. Open it from its own web address instead.'
+              : 'Nothing is being recorded. Allow location for this site in your browser settings, then start again.',
+            speak: 'Location blocked. Not recording.'
+          });
+        } else if (waited > STUCK_MS) {
+          // No fix and no error either — a silently blocked frame looks exactly
+          // like this, and "still waiting" after several minutes is a lie.
+          setDriveAlert({
+            key: 'stuck', hard: true, title: 'Still no location',
+            body: 'Nothing recorded in ' + U.fmtDuration(waited) + '. Location is not reaching this page — most likely it is blocked here. Stop and check rather than keep driving.',
+            speak: 'Still no location. Nothing is being recorded.'
+          });
+        } else {
+          setDriveAlert({
+            key: 'nofix', hard: true, title: 'No location yet',
+            body: 'Nothing is being recorded yet — still waiting for a first fix. Outdoors with a clear view of the sky is fastest.',
+            speak: 'No location yet. Not recording.'
+          });
+        }
+        return;
+      }
+    } else if (now - S.lastFixT > LOST_FIX_MS) {
+      setDriveAlert({
+        key: 'lost', hard: false,
+        title: 'Location lost',
+        body: 'No fix for ' + U.fmtDuration(now - S.lastFixT) + '. This stretch is not being recorded.',
+        speak: 'Location lost.'
+      });
+      return;
+    }
+    setDriveAlert(null);
+  }
+
+  function setDriveAlert(a) {
+    var box = $('driveAlert');
+    if (!a) {
+      if (S.alertState) { box.classList.add('hidden'); S.alertState = null; }
+      return;
+    }
+    if (S.alertState !== a.key) {
+      S.alertState = a.key;
+      box.classList.remove('hidden');
+      box.classList.toggle('is-soft', !a.hard);
+      $('driveAlertTitle').textContent = a.title;
+      $('driveAlertBody').textContent = a.body;
+      // Say it once per condition: eyes belong on the road.
+      if (a.speak && S.alertSpokenFor !== a.key) {
+        S.alertSpokenFor = a.key;
+        TL.alerts.speak(a.speak);
+        TL.alerts.tone([700, 460, 320], 420, 0.2);
+      }
+    } else if (a.key === 'lost' || a.key === 'stuck') {
+      $('driveAlertBody').textContent = a.body;
+    }
   }
 
   function beginTrip(mode) {
@@ -76,6 +157,7 @@
         ? U.speedFrom(S.settings.defaultLimit, S.settings.units) : null;
       S.trip.setLimit(lim, lim ? 'manual' : 'none');
     }
+    setDriveAlert(null);
     renderLimitPicker();
     renderTicker();
     updateCounts();
@@ -143,7 +225,7 @@
     if (S.raf) return;
     var loop = function () {
       S.raf = requestAnimationFrame(loop);
-      if (S.mode === 'live') liveTick();
+      if (S.mode === 'live') { liveTick(); checkFixHealth(); }
       renderHUD();
     };
     S.raf = requestAnimationFrame(loop);
@@ -585,6 +667,26 @@
     });
   }
 
+  /* Say up front when tracking cannot work here, rather than letting someone
+     tap Start, drive off, and find out later that nothing was recorded. */
+  function checkTrackingAvailability() {
+    if (!navigator.permissions || !navigator.permissions.query) return;
+    try {
+      navigator.permissions.query({ name: 'geolocation' }).then(function (st) {
+        if (st.state === 'denied') {
+          var n = $('homeBlocked');
+          if (!TL.sensors.inIframe()) {
+            n.innerHTML = '<strong>Location is blocked for this site.</strong> ' +
+              'A trip would record nothing at all. Allow location in your browser ' +
+              'settings for this page, then reload. The demo works either way.';
+          }
+          n.classList.remove('hidden');
+          $('btnStart').classList.remove('btn-primary');
+        }
+      }).catch(function () {});
+    } catch (e) { /* older browsers cannot query geolocation permission */ }
+  }
+
   /* ---------------- diagnostics ---------------- */
   function runDiagnostics() {
     var host = $('diagList');
@@ -709,6 +811,11 @@
     });
 
     $('btnStart').addEventListener('click', startLive);
+    $('btnAlertStop').addEventListener('click', stopTrip);
+    $('btnAlertWhy').addEventListener('click', function () {
+      showScreen('settings'); renderSettings(); runDiagnostics();
+      $('diagList').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
     $('btnStop').addEventListener('click', stopTrip);
     $('btnDemoHome').addEventListener('click', function () { runDemo(S.settings.demoProfile || 'average'); });
     $('btnCheck').addEventListener('click', function () {
@@ -838,6 +945,7 @@
       if (S.mode === 'live') { e.preventDefault(); e.returnValue = ''; }
     });
 
+    checkTrackingAvailability();
     renderWeights();
     renderHome();
     renderSettings();

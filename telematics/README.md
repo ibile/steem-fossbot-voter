@@ -19,6 +19,12 @@ Sensors need a **secure origin**, so `file://` will not do for live tracking.
 | GitHub Pages | enable Pages for the repo, open `/telematics/` | Easiest way to get it on a phone |
 | Single file | open `dist/traction-circle.html` | Demo mode works anywhere; live tracking still needs HTTPS |
 
+**Embedded viewers block location.** Opened inside another app's in-app browser
+or an iframe without a geolocation grant, the page cannot read your position and
+a trip records nothing. The app now says so before you start and again, out
+loud, within seconds of starting. Open it from its own web address to track a
+real drive.
+
 On iOS, motion access requires an explicit tap — that is what the
 **Start tracking a drive** button is for. Answer both prompts (motion and
 location) with allow.
