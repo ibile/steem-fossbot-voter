@@ -107,7 +107,7 @@
     var jerk = acc.jerkRms || 0;
     comps.push({
       key: 'smoothness', label: LABELS.smoothness, weight: WEIGHTS.smoothness,
-      score: U.clamp(decayScore(Math.max(0, jerk - 0.30), 0.372), 55, 100),
+      score: U.clamp(decayScore(Math.max(0, jerk - 0.18), 1.13), 55, 100),
       rate: jerk, count: null, unit: 'm/s³ RMS jerk',
       available: acc.movingMs > 30000
     });

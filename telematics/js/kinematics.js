@@ -72,6 +72,10 @@
     this.aLongGpsLp = 0;
     this.aLatImu = 0;
     this.prevALong = 0;
+    this.aLongSmooth = 0;
+    this.vibSq = 0;
+    this.vibMs = 0;
+    this.vibRms = 0;
     this.distance = 0;
     this.tickT = null;
   };
@@ -316,9 +320,29 @@
     // Below walking pace lateral g is meaningless and mostly handling noise.
     if (v < 2.0) this.aLat *= U.clamp((v - 0.5) / 1.5, 0, 1);
 
-    var jd = U.emaAlpha(dt, 0.35);
-    var rawJerk = dt > 0 ? (this.aLong - prev) / dt : 0;
+    // Jerk, band-limited to where a driver's inputs actually live.
+    //
+    // Differentiating and then low-passing ONCE does not work: above the
+    // cutoff the differentiator's gain (proportional to f) and the pole's
+    // attenuation (proportional to 1/f) cancel exactly, so cradle rattle and
+    // road buzz at 5-20 Hz pass straight through at full strength and get
+    // scored as jerky driving. Pedal and steering inputs are all below about
+    // 0.5 Hz, so smooth FIRST, differentiate the smoothed signal, then smooth
+    // again — two poles after the differentiator roll vibration off as 1/f.
+    var sa = U.emaAlpha(dt, 0.8);
+    var prevSmooth = this.aLongSmooth;
+    this.aLongSmooth += sa * (this.aLong - this.aLongSmooth);
+    var rawJerk = dt > 0 ? (this.aLongSmooth - prevSmooth) / dt : 0;
+    var jd = U.emaAlpha(dt, 0.6);
     this.jerk += jd * (U.clamp(rawJerk, -60, 60) - this.jerk);
+
+    // What was filtered out is itself worth knowing: it measures how much the
+    // phone is shaking, which is a property of the mount and the road surface
+    // rather than of the driving. Reported, never scored.
+    var resid = this.aLong - this.aLongSmooth;
+    this.vibSq += resid * resid * dt;
+    this.vibMs += dt;
+    this.vibRms = this.vibMs > 0 ? Math.sqrt(this.vibSq / this.vibMs) : 0;
     this.tickT = t;
   };
 
@@ -357,6 +381,7 @@
       accuracy: this.accuracy,
       distance: this.distance,
       calConf: this.calConf,
+      vibRms: this.vibRms,
       hasMotion: this.hasMotion,
       hasGyro: this.hasGyro,
       motionRate: this.motionRate,

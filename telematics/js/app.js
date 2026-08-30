@@ -518,6 +518,11 @@
     var qbits = [];
     qbits.push(q.hasMotion ? (q.hasGyro ? 'GPS + accelerometer + gyro' : 'GPS + accelerometer') : 'GPS only');
     if (q.calConf != null && q.hasMotion) qbits.push('axis calibration ' + Math.round(q.calConf * 100) + '%');
+    if (q.hasMotion && acc.vibRms > 0.02) {
+      var vb = acc.vibRms < 0.25 ? 'mount steady'
+        : (acc.vibRms < 0.6 ? 'mount shaking a little' : 'mount shaking a lot');
+      qbits.push(vb + ' (' + acc.vibRms.toFixed(2) + ' m/s²)');
+    }
     if (sc.speedMeasured) {
       var speedComp = null;
       sc.components.forEach(function (c) { if (c.key === 'speeding') speedComp = c; });
@@ -590,7 +595,7 @@
       if (c.key === 'speeding') {
         detail = c.available ? (c.meanExcess != null ? c.meanExcess.toFixed(1) + '% mean over' : '') : 'no limit set';
       } else if (c.key === 'smoothness') {
-        detail = c.rate.toFixed(2) + ' m/s³';
+        detail = c.rate.toFixed(2) + ' m/s³ — vibration filtered out';
       } else if (c.key === 'focus') {
         detail = c.count + ' taps';
       } else if (c.key === 'context') {

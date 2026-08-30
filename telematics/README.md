@@ -97,7 +97,7 @@ sensors at all still scores from GPS alone.
 | Braking | 22% | severity-weighted events per 100 km |
 | Cornering | 20% | severity-weighted events per 100 km |
 | Acceleration | 15% | severity-weighted events per 100 km |
-| Smoothness | 8% | RMS jerk (floored at 55 — a secondary signal) |
+| Smoothness | 8% | RMS jerk, band-limited below driver-input frequencies (floored at 55) |
 | Focus | 6% | deliberate taps on this app while moving (floored at 45) |
 | Context | 4% | night driving, hours without a break |
 
@@ -121,6 +121,28 @@ sensors at all still scores from GPS alone.
 
 Thresholds sit where the industry generally puts them — about 0.30 g
 noticeable, 0.40 g harsh, 0.52 g severe — adjustable in Setup.
+
+### Smoothness must measure driving, not the mount
+
+Jerk is the derivative of acceleration, and differentiation amplifies high
+frequencies — which is exactly where a rattling cradle and a rough road surface
+live (roughly 5–20 Hz), while a driver's pedal and steering inputs are all
+below about 0.5 Hz.
+
+Differentiating and then low-passing *once* does not separate them: above the
+cutoff the differentiator's gain (∝ f) and the pole's attenuation (∝ 1/f)
+cancel, so vibration passes through at full strength at any frequency. Measured
+on a steady cruise with zero driver input, 0.5 m/s² of vibration alone was
+enough to drag smoothness from 100 to 64.
+
+The signal is therefore smoothed *before* differentiating and again after, so
+two poles follow the differentiator and vibration rolls off as 1/f. The same
+test now moves jerk by 0.02 instead of 1.5 — about 75× less — while the
+Careful / Typical / Hurried profiles still separate cleanly at 100 / 91 / 78.
+
+What gets filtered out is not thrown away: its RMS is reported on each trip as
+mount vibration, so you can see whether your holder is shaking without it ever
+affecting your score.
 
 ## What this is not
 

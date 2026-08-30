@@ -32,7 +32,7 @@
       distanceM: 0, movingMs: 0, idleMs: 0, totalMs: 0,
       maxSpeed: 0, limitKnownMs: 0,
       overMs: { mild: 0, harsh: 0, severe: 0 },
-      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0, limitAutoMs: 0,
+      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0, limitAutoMs: 0, vibRms: 0,
       jerkSqSum: 0, jerkMs: 0, events: []
     };
     this.finished = false;
@@ -79,6 +79,7 @@
       a.maxSpeed = Math.max(a.maxSpeed, s.speed);
       a.jerkSqSum += s.jerk * s.jerk * dt;
       a.jerkMs += dt;
+      a.vibRms = s.vibRms || 0;
       var wall = this.startedAt + (tMs - this.t0);
       var hr = new Date(wall).getHours();
       if (hr >= 23 || hr < 5) a.nightMs += dt;
@@ -148,6 +149,7 @@
       meanExcessPct: a.limitKnownMs > 0 ? a.excessPctMs / a.limitKnownMs : 0,
       nightMs: a.nightMs, interactions: a.interactions,
       jerkRms: a.jerkMs > 0 ? Math.sqrt(a.jerkSqSum / a.jerkMs) : 0,
+      vibRms: a.vibRms || 0,
       events: a.events.slice(),
       avgSpeed: a.movingMs > 0 ? a.distanceM / (a.movingMs / 1000) : 0
     };
@@ -173,6 +175,7 @@
         hasMotion: this.kin.hasMotion,
         hasGyro: this.kin.hasGyro,
         calConf: Math.round(this.kin.calConf * 100) / 100,
+        vibRms: Math.round((this.kin.vibRms || 0) * 100) / 100,
         fixes: this.kin.fixCount
       }
     };

@@ -1283,6 +1283,10 @@ a { color: var(--accent); }
     this.aLongGpsLp = 0;
     this.aLatImu = 0;
     this.prevALong = 0;
+    this.aLongSmooth = 0;
+    this.vibSq = 0;
+    this.vibMs = 0;
+    this.vibRms = 0;
     this.distance = 0;
     this.tickT = null;
   };
@@ -1527,9 +1531,29 @@ a { color: var(--accent); }
     // Below walking pace lateral g is meaningless and mostly handling noise.
     if (v < 2.0) this.aLat *= U.clamp((v - 0.5) / 1.5, 0, 1);
 
-    var jd = U.emaAlpha(dt, 0.35);
-    var rawJerk = dt > 0 ? (this.aLong - prev) / dt : 0;
+    // Jerk, band-limited to where a driver's inputs actually live.
+    //
+    // Differentiating and then low-passing ONCE does not work: above the
+    // cutoff the differentiator's gain (proportional to f) and the pole's
+    // attenuation (proportional to 1/f) cancel exactly, so cradle rattle and
+    // road buzz at 5-20 Hz pass straight through at full strength and get
+    // scored as jerky driving. Pedal and steering inputs are all below about
+    // 0.5 Hz, so smooth FIRST, differentiate the smoothed signal, then smooth
+    // again — two poles after the differentiator roll vibration off as 1/f.
+    var sa = U.emaAlpha(dt, 0.8);
+    var prevSmooth = this.aLongSmooth;
+    this.aLongSmooth += sa * (this.aLong - this.aLongSmooth);
+    var rawJerk = dt > 0 ? (this.aLongSmooth - prevSmooth) / dt : 0;
+    var jd = U.emaAlpha(dt, 0.6);
     this.jerk += jd * (U.clamp(rawJerk, -60, 60) - this.jerk);
+
+    // What was filtered out is itself worth knowing: it measures how much the
+    // phone is shaking, which is a property of the mount and the road surface
+    // rather than of the driving. Reported, never scored.
+    var resid = this.aLong - this.aLongSmooth;
+    this.vibSq += resid * resid * dt;
+    this.vibMs += dt;
+    this.vibRms = this.vibMs > 0 ? Math.sqrt(this.vibSq / this.vibMs) : 0;
     this.tickT = t;
   };
 
@@ -1568,6 +1592,7 @@ a { color: var(--accent); }
       accuracy: this.accuracy,
       distance: this.distance,
       calConf: this.calConf,
+      vibRms: this.vibRms,
       hasMotion: this.hasMotion,
       hasGyro: this.hasGyro,
       motionRate: this.motionRate,
@@ -1901,7 +1926,7 @@ a { color: var(--accent); }
     var jerk = acc.jerkRms || 0;
     comps.push({
       key: 'smoothness', label: LABELS.smoothness, weight: WEIGHTS.smoothness,
-      score: U.clamp(decayScore(Math.max(0, jerk - 0.30), 0.372), 55, 100),
+      score: U.clamp(decayScore(Math.max(0, jerk - 0.18), 1.13), 55, 100),
       rate: jerk, count: null, unit: 'm/s³ RMS jerk',
       available: acc.movingMs > 30000
     });
@@ -2050,7 +2075,7 @@ a { color: var(--accent); }
       distanceM: 0, movingMs: 0, idleMs: 0, totalMs: 0,
       maxSpeed: 0, limitKnownMs: 0,
       overMs: { mild: 0, harsh: 0, severe: 0 },
-      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0, limitAutoMs: 0,
+      maxOverPct: 0, excessPctMs: 0, nightMs: 0, interactions: 0, limitAutoMs: 0, vibRms: 0,
       jerkSqSum: 0, jerkMs: 0, events: []
     };
     this.finished = false;
@@ -2097,6 +2122,7 @@ a { color: var(--accent); }
       a.maxSpeed = Math.max(a.maxSpeed, s.speed);
       a.jerkSqSum += s.jerk * s.jerk * dt;
       a.jerkMs += dt;
+      a.vibRms = s.vibRms || 0;
       var wall = this.startedAt + (tMs - this.t0);
       var hr = new Date(wall).getHours();
       if (hr >= 23 || hr < 5) a.nightMs += dt;
@@ -2166,6 +2192,7 @@ a { color: var(--accent); }
       meanExcessPct: a.limitKnownMs > 0 ? a.excessPctMs / a.limitKnownMs : 0,
       nightMs: a.nightMs, interactions: a.interactions,
       jerkRms: a.jerkMs > 0 ? Math.sqrt(a.jerkSqSum / a.jerkMs) : 0,
+      vibRms: a.vibRms || 0,
       events: a.events.slice(),
       avgSpeed: a.movingMs > 0 ? a.distanceM / (a.movingMs / 1000) : 0
     };
@@ -2191,6 +2218,7 @@ a { color: var(--accent); }
         hasMotion: this.kin.hasMotion,
         hasGyro: this.kin.hasGyro,
         calConf: Math.round(this.kin.calConf * 100) / 100,
+        vibRms: Math.round((this.kin.vibRms || 0) * 100) / 100,
         fixes: this.kin.fixCount
       }
     };
@@ -4293,6 +4321,11 @@ a { color: var(--accent); }
     var qbits = [];
     qbits.push(q.hasMotion ? (q.hasGyro ? 'GPS + accelerometer + gyro' : 'GPS + accelerometer') : 'GPS only');
     if (q.calConf != null && q.hasMotion) qbits.push('axis calibration ' + Math.round(q.calConf * 100) + '%');
+    if (q.hasMotion && acc.vibRms > 0.02) {
+      var vb = acc.vibRms < 0.25 ? 'mount steady'
+        : (acc.vibRms < 0.6 ? 'mount shaking a little' : 'mount shaking a lot');
+      qbits.push(vb + ' (' + acc.vibRms.toFixed(2) + ' m/s²)');
+    }
     if (sc.speedMeasured) {
       var speedComp = null;
       sc.components.forEach(function (c) { if (c.key === 'speeding') speedComp = c; });
@@ -4365,7 +4398,7 @@ a { color: var(--accent); }
       if (c.key === 'speeding') {
         detail = c.available ? (c.meanExcess != null ? c.meanExcess.toFixed(1) + '% mean over' : '') : 'no limit set';
       } else if (c.key === 'smoothness') {
-        detail = c.rate.toFixed(2) + ' m/s³';
+        detail = c.rate.toFixed(2) + ' m/s³ — vibration filtered out';
       } else if (c.key === 'focus') {
         detail = c.count + ' taps';
       } else if (c.key === 'context') {
