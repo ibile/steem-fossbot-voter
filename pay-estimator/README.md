@@ -150,22 +150,32 @@ change.
 
 ## Installing it on a phone
 
-The folder is a progressive web app — `manifest.webmanifest`, a service worker
-and two icons alongside the page. Serve it over HTTPS and Chrome on Android
-offers **Install app** from its menu; after that it opens from the home screen,
-runs offline and keeps its own storage.
+The folder is a progressive web app: `manifest.webmanifest`, a service worker,
+icons and store-style screenshots alongside the page. Served over HTTPS it meets
+Chrome's installability bar, so the app offers its own **Install** button rather
+than hiding behind a browser menu. Once installed it gets a home-screen icon,
+opens in its own window with no browser chrome, runs with no signal, keeps its
+own storage, and updates itself in the background.
 
-The quickest host is GitHub Pages: in the repository's **Settings → Pages**,
-publish from this branch, then open
-`https://<user>.github.io/<repo>/pay-estimator/` on the phone.
+**Hosting it.** GitHub Pages is the least work: in the repository's
+**Settings → Pages**, publish from this branch, root folder, then open
+`https://<user>.github.io/<repo>/pay-estimator/` on the phone. Any static HTTPS
+host works equally well — the app makes no network calls of its own.
 
-Opening `index.html` from local storage on the phone also works and stays
-offline, but a file cannot be installed as an app — Chrome only offers **Add to
-Home screen**, which makes a shortcut rather than an installed app.
+**On the phone.** Chrome shows an install prompt, and the app's own banner
+offers one too. iPhone has no install API, so Safari installs it through
+Share → Add to Home Screen; the app says so when it can't offer a button.
 
-`service-worker.js` serves the page network-first, so an update reaches an
-installed copy on its next launch with signal. Everything else is cache-first;
-bump `CACHE` when the shell files change.
+Two home-screen shortcuts come with it — long-press the icon for *Add today's
+shift* and *Pay breakdown*.
+
+Opening `index.html` straight off the phone's storage also works offline, but a
+`file://` page can never be installed — Chrome only offers a plain shortcut.
+
+`service-worker.js` serves the page network-first so an update reaches an
+installed copy on its next launch with signal, and everything else cache-first.
+Bump `CACHE` when the shell files change; the app shows a *newer version is
+ready* prompt when a new worker takes over.
 
 ## Moving your setup between copies
 

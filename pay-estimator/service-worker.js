@@ -1,5 +1,5 @@
 /* Offline shell for the installed app. Bump CACHE when index.html changes. */
-var CACHE = "rota-payslip-v1";
+var CACHE = "rota-payslip-v2";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function(e){

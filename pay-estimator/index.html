@@ -2,6 +2,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1D2A56">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="application-name" content="Rota to Payslip">
 <meta name="apple-mobile-web-app-title" content="Rota Pay">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
@@ -210,6 +213,17 @@ details.acc .card-bd{padding-top:0}
 @media (prefers-reduced-motion: reduce){*{transition-duration:.01ms !important;animation-duration:.01ms !important}}
 
 /* ---------- misc ---------- */
+.banner{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.banner .bt{flex:1;min-width:0}
+.banner .bt b{display:block;font-size:13.5px}
+.banner .bt span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.updater{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:75;
+  max-width:576px;margin:0 auto;background:var(--band);color:var(--band-ink);border-radius:12px;
+  box-shadow:var(--shadow);padding:12px 14px;display:flex;align-items:center;gap:12px}
+.updater[hidden]{display:none !important}
+.updater span{flex:1;font-size:13px}
+.updater button{background:var(--band-ink);color:var(--band);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600}
+.appstat{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--pos);font-weight:600}
 .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:80;background:var(--band);color:var(--band-ink);
   padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;text-align:center}
 .toast.on{opacity:1;transform:translate(-50%,0)}
@@ -279,6 +293,14 @@ details.acc .card-bd{padding-top:0}
 
 <!-- ============ ROTA ============ -->
 <section class="panel" id="p-rota" role="tabpanel" aria-labelledby="tab-rota">
+  <div class="card" id="installBanner" hidden>
+    <div class="banner">
+      <div class="bt"><b>Add it to your home screen</b><span>Opens like an app, works with no signal</span></div>
+      <button class="btn primary sm" id="installGo">Install</button>
+      <button class="btn sm ghost" id="installNo" aria-label="Not now">&times;</button>
+    </div>
+  </div>
+
   <div class="card" id="keyDates">
     <div class="split three" id="keyGrid"></div>
     <p class="keynote" id="keyNote"></p>
@@ -480,6 +502,11 @@ details.acc .card-bd{padding-top:0}
   </div>
 
   <div class="card">
+    <div class="card-hd"><h2>This app</h2></div>
+    <div class="card-bd" id="appCard"></div>
+  </div>
+
+  <div class="card">
     <details class="acc">
       <summary>Backup &amp; reset</summary>
       <div class="card-bd">
@@ -528,6 +555,10 @@ details.acc .card-bd{padding-top:0}
   </div>
 </div>
 <div class="zoom" id="zoom"><img id="zoomImg" alt="Your rota"></div>
+<div class="updater" id="updater" hidden>
+  <span>A newer version is ready.</span>
+  <button id="updateGo">Reload</button>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1740,6 +1771,67 @@ $("resetAll").addEventListener("click", function(){
   save(); renderSetup(); render(); toast("Reset");
 });
 
+/* ---------------- installing ---------------- */
+var installPrompt = null, DISMISS = "rotaPayslip.installOff";
+
+function isInstalled(){
+  try{
+    return window.matchMedia("(display-mode: standalone)").matches ||
+           window.matchMedia("(display-mode: minimal-ui)").matches ||
+           navigator.standalone === true;
+  }catch(e){ return false; }
+}
+function dismissed(){
+  try{ return localStorage.getItem(DISMISS) === "1"; }catch(e){ return false; }
+}
+function renderInstall(){
+  var installed = isInstalled();
+  $("installBanner").hidden = installed || !installPrompt || dismissed();
+
+  var card = $("appCard");
+  if(!card) return;
+  if(installed){
+    card.innerHTML = '<p class="appstat">&#10003; Running as an installed app</p>' +
+      '<p class="hint" style="margin:8px 0 0">It updates itself whenever you open it with a signal. Everything you enter stays on this device.</p>';
+  } else if(installPrompt){
+    card.innerHTML = '<p class="hint" style="margin:0 0 10px">Install it and it gets its own icon, opens without the browser bar, and works with no signal.</p>' +
+      '<button class="btn primary" id="installGo2" style="width:100%">Install this app</button>';
+    $("installGo2").addEventListener("click", doInstall);
+  } else {
+    card.innerHTML = '<p class="hint" style="margin:0">To keep it on your home screen:<br>' +
+      '<b>Android, Chrome</b> &mdash; menu (&#8942;) &rarr; Add to home screen.<br>' +
+      '<b>iPhone, Safari</b> &mdash; Share &rarr; Add to Home Screen.<br>' +
+      'It then opens like any other app and works offline.</p>';
+  }
+}
+function doInstall(){
+  if(!installPrompt) return;
+  var p = installPrompt;
+  installPrompt = null;
+  p.prompt();
+  p.userChoice.then(function(res){
+    if(res && res.outcome === "accepted") toast("Installing\u2026");
+    renderInstall();
+  }, function(){ renderInstall(); });
+}
+window.addEventListener("beforeinstallprompt", function(e){
+  e.preventDefault();
+  installPrompt = e;
+  renderInstall();
+});
+window.addEventListener("appinstalled", function(){
+  installPrompt = null;
+  try{ localStorage.removeItem(DISMISS); }catch(err){}
+  renderInstall();
+  toast("Installed \u2014 open it from your home screen");
+});
+$("installGo").addEventListener("click", doInstall);
+$("installNo").addEventListener("click", function(){
+  try{ localStorage.setItem(DISMISS, "1"); }catch(e){}
+  renderInstall();
+});
+$("updateGo").addEventListener("click", function(){ location.reload(); });
+
 /* ---------------- go ---------------- */
 function syncHeader(){
   var h = document.querySelector("header");
@@ -1765,8 +1857,19 @@ render();
 syncHeader();
 if(inPreview()) $("icsNote").innerHTML =
   '<p class="hint" style="margin:10px 0 0">Calendar files save from the installed app, not from this preview.</p>';
+renderInstall();
+
 if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+  var hadWorker = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register("./service-worker.js").catch(function(){});
+  navigator.serviceWorker.addEventListener("controllerchange", function(){
+    if(hadWorker) $("updater").hidden = false;    /* a newer build took over */
+  });
 }
+
+/* home-screen shortcuts land here */
+var go = (location.search.match(/[?&]go=([a-z]+)/) || [])[1];
+if(go === "slip") $("tab-slip").click();
+else if(go === "today") openSheet(iso(new Date()));
 })();
 </script>
